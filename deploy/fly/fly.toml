@@ -1,0 +1,48 @@
+# Buzz relay on Fly Machines — scale-to-zero + persistent git volume.
+#
+# Bootstrap (once): see deploy/fly/README.md
+#   fly apps create buzz-relay-pathx
+#   fly volumes create buzz_git --size 10 --region iad -a buzz-relay-pathx
+#   fly secrets import < deploy/fly/secrets.env   # never commit secrets.env
+#   fly deploy --config deploy/fly/fly.toml
+
+app = "buzz-relay-pathx"
+primary_region = "iad"
+
+[build]
+  image = "ghcr.io/block/buzz:main"
+
+[env]
+  BUZZ_BIND_ADDR = "0.0.0.0:3000"
+  BUZZ_HEALTH_PORT = "8080"
+  BUZZ_METRICS_PORT = "9102"
+  BUZZ_GIT_REPO_PATH = "/data/git"
+  BUZZ_AUTO_MIGRATE = "true"
+  BUZZ_GIT_CONFORMANCE_PROBE = "true"
+  # S3: set BUZZ_S3_* via secrets (Tigris, R2, or AWS-compatible).
+  # Postgres: DATABASE_URL secret (Railway TCP proxy — self-hosted).
+  # Redis: REDIS_URL secret (Railway TCP proxy — self-hosted).
+
+[mounts]
+  source = "buzz_git"
+  destination = "/data/git"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "45s"
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    path = "/_readiness"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048
