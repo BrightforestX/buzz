@@ -1,0 +1,84 @@
+mission: PX-FLY-CONTEXT-PORTFOLIO-v1
+iteration: 2
+updated_at: "2026-09-12T01:08:00Z"
+last_agent: composer-2.5
+
+workstreams:
+  ws1_idle_30s:
+    status: complete
+    notes: STACK_IDLE_SECONDS overrides STACK_IDLE_MINUTES; health_monitor pings excluded
+  ws2_mentra_fly:
+    status: deployed
+    app: mentra-server-pathx
+    url: https://mentra-server-pathx.fly.dev
+  ws3_formal:
+    status: partial
+    notes: FlyStackLifecycle.p, fly_topology.als, GlassesVoiceBuzz GW6; quint test pass
+  ws4_surreal_context:
+    status: complete
+    doc: 06-pipelines/linkml-surreal/docs/context-layer-fly.md
+  ws5_context_pipeline:
+    status: deployed
+    app: buzz-context-pipeline
+    url: https://buzz-context-pipeline.fly.dev
+    notes: Dockerfile COPY fix in loop 2; auto_stop may show machine stopped until traffic
+  ws6_test_plan:
+    status: complete
+    doc: .gsd/plans/FLY-PORTFOLIO-TEST-PLAN.md
+
+fly_apps:
+  buzz-stack-wake-proxy:
+    state: started
+    checks: "1/1"
+    public_probe: down_local_dns
+    ssh_health: '{"ok": true, "service": "stack-wake-proxy"}'
+  mentra-server-pathx:
+    state: started
+    checks: "1/1"
+    public_probe: down_local_dns
+    ssh_health_port_7010: '{"status":"healthy","app":"com.pathx.px","activeSessions":0}'
+  buzz-relay-pathx:
+    deploy_skipped: true
+    reason: DATABASE_URL placeholder (CHANGE_ME) in deploy/fly/secrets.env
+
+tests:
+  test_stack_wake_proxy: pass
+  mentra_grok_voice_tests: "15 pass (bun test tests/grok-voice-*.test.ts)"
+  quint_glasses_voice_buzz: pass
+
+stop_gate:
+  s1_idle_30_seconds: true
+  s2_mentra_on_fly: true
+  s3_formal_stub_passing: true
+  s4_context_layer_doc: true
+  s5_context_pipeline_scaffold: true
+  s6_portfolio_test_plan: true
+  passed: false
+
+stop_gate_blockers:
+  - Local DNS cannot resolve *.fly.dev (curl exit 6); use fly ssh console for probes
+  - buzz-relay-pathx not deployed — Railway DATABASE_URL still placeholder
+  - mentra.pathx.ai CNAME not configured
+  - Portfolio E2E not run (relay down)
+  - Temporal Cloud address optional for wake-proxy worker mode
+
+blockers:
+  railway:
+    - Provision Railway Postgres/Redis TCP proxy; set real DATABASE_URL in deploy/fly/secrets.env
+  dns:
+    - "Fix local resolver or use fly ssh console for *.fly.dev probes"
+  temporal:
+    - Set TEMPORAL_ADDRESS + TEMPORAL_API_KEY for durable wake workflows (optional)
+
+next_smallest_action: >-
+  Set real Railway DATABASE_URL in buzz/deploy/fly/secrets.env and deploy buzz-relay-pathx;
+  add Cloudflare CNAME mentra.pathx.ai → mentra-server-pathx.fly.dev;
+  run portfolio E2E from .gsd/plans/FLY-PORTFOLIO-TEST-PLAN.md.
+
+loop:
+  status: stopped
+  stopped_at: "2026-09-12T04:18:00Z"
+  stopped_reason: user requested stop; no recurring heartbeat armed
+
+pending_edits: []
+open_questions: []
