@@ -100,14 +100,15 @@ export function GlassesVoiceBunkerCard() {
         title="Glasses voice bunker"
       />
       <SettingsOptionGroup>
-        <SettingsOptionRow
-          description={
-            status.running
-              ? `Listening on port ${status.port}. Desktop must stay online for voice turns.`
-              : "Start the local NIP-46 bunker before using Buzz wake phrases on glasses."
-          }
-          label="Bunker"
-        >
+        <SettingsOptionRow>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Bunker</p>
+            <p className="text-xs text-muted-foreground/70">
+              {status.running
+                ? `Listening on port ${status.port}. Desktop must stay online for voice turns.`
+                : "Start the local NIP-46 bunker before using Buzz wake phrases on glasses."}
+            </p>
+          </div>
           <Button
             data-testid="glasses-bunker-toggle"
             disabled={busy || loading}
@@ -125,10 +126,14 @@ export function GlassesVoiceBunkerCard() {
         </SettingsOptionRow>
 
         {status.bunker_url ? (
-          <SettingsOptionRow
-            description="Paste into Mentra BUZZ_NIP46_BUNKER_URL (use ngrok for remote glasses)."
-            label="Bunker URL"
-          >
+          <SettingsOptionRow>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Bunker URL</p>
+              <p className="text-xs text-muted-foreground/70">
+                Paste into Mentra BUZZ_NIP46_BUNKER_URL (use ngrok for remote
+                glasses).
+              </p>
+            </div>
             <div className="flex max-w-full items-center gap-2">
               <code className="truncate text-xs">{status.bunker_url}</code>
               <Button
@@ -144,10 +149,15 @@ export function GlassesVoiceBunkerCard() {
           </SettingsOptionRow>
         ) : null}
 
-        <SettingsOptionRow
-          description='When Mentra connects, approve its ephemeral client pubkey here. Prompt: "Glasses Mentra wants to send channel messages as you."'
-          label="Allow Mentra client"
-        >
+        <SettingsOptionRow>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Allow Mentra client</p>
+            <p className="text-xs text-muted-foreground/70">
+              When Mentra connects, approve its ephemeral client pubkey here.
+              Prompt: &quot;Glasses Mentra wants to send channel messages as
+              you.&quot;
+            </p>
+          </div>
           <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row">
             <Input
               data-testid="glasses-bunker-client-pubkey"
@@ -168,10 +178,13 @@ export function GlassesVoiceBunkerCard() {
         </SettingsOptionRow>
 
         {status.allowed_clients.length > 0 ? (
-          <SettingsOptionRow
-            description="Only these client pubkeys may request sign_event."
-            label="Allowlisted clients"
-          >
+          <SettingsOptionRow>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Allowlisted clients</p>
+              <p className="text-xs text-muted-foreground/70">
+                Only these client pubkeys may request sign_event.
+              </p>
+            </div>
             <ul className="space-y-1 text-xs font-mono">
               {status.allowed_clients.map((pk) => (
                 <li key={pk}>{pk}</li>

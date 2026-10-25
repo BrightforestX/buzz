@@ -1,0 +1,1 @@
+../scripts/dev-macos-linker.sh
