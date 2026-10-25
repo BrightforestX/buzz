@@ -212,6 +212,9 @@ _ensure-migrations: _ensure-services
 
 # Run clippy on the desktop Tauri Rust crate
 desktop-tauri-clippy: _ensure-sidecar-stubs
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER || true
     cargo clippy --manifest-path {{desktop_tauri_manifest}} --workspace --all-targets -- -D warnings
 
 # Check the desktop Tauri Rust crate compiles
@@ -220,6 +223,9 @@ desktop-tauri-check: _ensure-sidecar-stubs
 
 # Run desktop Tauri Rust unit tests
 desktop-tauri-test: _ensure-sidecar-stubs
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER || true
     cd desktop/src-tauri && cargo test --workspace
 
 # Run the native terminal latency gate explicitly on a known-idle host.
