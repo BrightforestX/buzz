@@ -267,6 +267,22 @@ pub struct CliArgs {
     #[arg(long, env = "BUZZ_ACP_MCP_COMMAND", default_value = "")]
     pub mcp_command: String,
 
+    /// Optional second MCP server (baseten-chain-mcp) for chainlet tools.
+    #[arg(long, env = "BUZZ_ACP_CHAIN_MCP_COMMAND", default_value = "")]
+    pub chain_mcp_command: String,
+
+    /// Optional third MCP server (mirofish-mcp-server) for MiroFish simulation tools.
+    #[arg(long, env = "BUZZ_ACP_MIROFISH_MCP_COMMAND", default_value = "")]
+    pub mirofish_mcp_command: String,
+
+    /// MiroFish Flask backend URL forwarded to mirofish-mcp-server children.
+    #[arg(
+        long,
+        env = "BUZZ_ACP_MIROFISH_BASE_URL",
+        default_value = "http://127.0.0.1:5001"
+    )]
+    pub mirofish_base_url: String,
+
     /// Idle timeout: max seconds of silence before killing a turn.
     /// Resets on any agent stdout activity.
     #[arg(long, env = "BUZZ_ACP_IDLE_TIMEOUT")]
@@ -543,6 +559,9 @@ pub struct Config {
     pub agent_command: String,
     pub agent_args: Vec<String>,
     pub mcp_command: String,
+    pub chain_mcp_command: String,
+    pub mirofish_mcp_command: String,
+    pub mirofish_base_url: String,
     pub idle_timeout_secs: u64,
     pub max_turn_duration_secs: u64,
     pub agents: u32,
@@ -1150,12 +1169,23 @@ impl Config {
 
         validate_multiple_event_handling(args.multiple_event_handling, args.dedup)?;
 
+        let mut mirofish_base_url = args.mirofish_base_url;
+        if let Ok(url) = std::env::var("MIROFISH_BASE_URL") {
+            let trimmed = url.trim();
+            if !trimmed.is_empty() {
+                mirofish_base_url = trimmed.to_string();
+            }
+        }
+
         let config = Config {
             keys,
             relay_url: args.relay_url,
             agent_command,
             agent_args,
             mcp_command: args.mcp_command,
+            chain_mcp_command: args.chain_mcp_command,
+            mirofish_mcp_command: args.mirofish_mcp_command,
+            mirofish_base_url,
             idle_timeout_secs,
             max_turn_duration_secs,
             agents: args.agents,
@@ -1540,6 +1570,9 @@ mod tests {
             agent_command: "goose".into(),
             agent_args: vec!["acp".into()],
             mcp_command: "".into(),
+            chain_mcp_command: String::new(),
+            mirofish_mcp_command: String::new(),
+            mirofish_base_url: "http://127.0.0.1:5001".into(),
             idle_timeout_secs: DEFAULT_IDLE_TIMEOUT_SECS,
             max_turn_duration_secs: DEFAULT_MAX_TURN_DURATION_SECS,
             agents: 1,

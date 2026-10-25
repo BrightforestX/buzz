@@ -220,6 +220,13 @@ type MockBridgeOptions = {
     acp?: MockCommandAvailability;
     mcp?: MockCommandAvailability;
   };
+  agentMcpSettings?: {
+    chainMcpResolvable?: boolean;
+    mirofishMcpResolvable?: boolean;
+    resolvedChainCommand?: string | null;
+    resolvedMirofishCommand?: string | null;
+    getError?: string;
+  };
   managedAgents?: MockManagedAgentSeed[];
   /** Result returned by the mocked `add_agent_to_huddle` command. */
   addAgentToHuddleResult?: {

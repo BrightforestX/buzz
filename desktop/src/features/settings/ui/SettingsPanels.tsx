@@ -65,6 +65,7 @@ import { ChannelTemplatesSettingsCard } from "./ChannelTemplatesSettingsCard";
 import { ExperimentalFeaturesCard } from "./ExperimentalFeaturesCard";
 import { KeyboardShortcutsCard } from "./KeyboardShortcutsCard";
 import { MeshComputeSettingsCard } from "@/features/mesh-compute/ui/MeshComputeSettingsCard";
+import { GlassesVoiceBunkerCard } from "./GlassesVoiceBunkerCard";
 import { MobilePairingCard } from "./MobilePairingCard";
 import { ModerationQueueCard } from "./ModerationQueueCard";
 import { NotificationSettingsCard } from "./NotificationSettingsCard";
@@ -855,7 +856,12 @@ export function renderSettingsSection(
     case "local-archive":
       return <LocalArchiveSettingsCard />;
     case "mobile":
-      return <MobilePairingCard currentPubkey={props.currentPubkey} />;
+      return (
+        <div className="space-y-10">
+          <MobilePairingCard currentPubkey={props.currentPubkey} />
+          <GlassesVoiceBunkerCard />
+        </div>
+      );
     case "updates":
       return <UpdateChecker />;
     default: {

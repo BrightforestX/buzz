@@ -3,13 +3,16 @@ mod agent;
 pub mod auth;
 mod builtin;
 pub mod catalog;
+mod chainlet_context;
 pub mod config;
 mod handoff;
 mod hints;
 mod llm;
 mod mcp;
 pub mod model_capabilities;
+mod ontology_gate;
 mod permission;
+mod shell_recovery;
 pub mod types;
 mod wire;
 
@@ -467,10 +470,13 @@ async fn session_new(app: &Arc<App>, id: Value, params: Value, wire_tx: &WireSen
             Some(client_prompt) if !client_prompt.trim().is_empty() => client_prompt.to_owned(),
             _ => app.cfg.system_prompt.clone(),
         };
-        let prompt = if hints_text.is_empty() {
-            base
-        } else {
-            format!("{base}\n\n{hints_text}")
+        let prompt = {
+            let with_hints = if hints_text.is_empty() {
+                base
+            } else {
+                format!("{base}\n\n{hints_text}")
+            };
+            chainlet_context::append_chainlet_context(with_hints)
         };
         // Reject combined prompts exceeding 512KB.
         if prompt.len() > MAX_SYSTEM_PROMPT_BYTES {
@@ -538,6 +544,9 @@ async fn session_new(app: &Arc<App>, id: Value, params: Value, wire_tx: &WireSen
         Ok(m) => Arc::new(m),
         Err(e) => return reject(wire_tx, id, e.json_rpc_code(), &e.to_string()).await,
     };
+    if let Err(e) = ontology_gate::run_preflight(&mcp, &app.cfg).await {
+        return reject(wire_tx, id, e.json_rpc_code(), &e.to_string()).await;
+    }
     let session_id = match session_token() {
         Ok(t) => format!("ses_{t}"),
         Err(e) => return reject(wire_tx, id, -32000, &e).await,

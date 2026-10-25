@@ -306,6 +306,18 @@ impl McpRegistry {
         self.by_qname.contains_key(qname)
     }
 
+    /// First registered server exposing `bare` (e.g. `validate_proposal`), in
+    /// config order. Used by the ontology preflight gate at `session/new`.
+    pub fn find_bare_tool(&self, bare: &str) -> Option<String> {
+        for server in &self.servers {
+            let qname = format!("{}{SEP}{}", server.name, bare);
+            if self.by_qname.contains_key(&qname) {
+                return Some(qname);
+            }
+        }
+        None
+    }
+
     /// True if `qname` resolves to a hidden hook tool (bare name starts
     /// with `_`). Used to reject hook calls coming from the LLM path —
     /// hooks are only callable via `call_hooks`.

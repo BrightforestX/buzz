@@ -69,6 +69,7 @@ INTERLEAVED_AGENT_REPORTS_TASK = "interleaved-agent-reports"
 CROSS_THREAD_REQUESTS_TASK = "cross-thread-requests"
 AMBIGUOUS_USER_MENTION_TASK = "ambiguous-user-mention"
 MEMORY_RETRIEVAL_TASK = "memory-retrieval"
+VOICE_WAKE_MENTION_TASK = "voice-wake-mention"
 
 _CREATE_CHANNEL_FIXTURE = BuzzTaskFixture(
     directory=tuple(
@@ -216,6 +217,7 @@ _FIXTURES = {
     CROSS_THREAD_REQUESTS_TASK: _CROSS_THREAD_REQUESTS_FIXTURE,
     AMBIGUOUS_USER_MENTION_TASK: _AMBIGUOUS_USER_MENTION_FIXTURE,
     MEMORY_RETRIEVAL_TASK: _MEMORY_RETRIEVAL_FIXTURE,
+    VOICE_WAKE_MENTION_TASK: BuzzTaskFixture(requires_evidence=True),
 }
 
 

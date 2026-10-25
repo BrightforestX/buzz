@@ -68,6 +68,11 @@ function configuredStepDetail(
       return step.emoji?.trim() || null;
     case "set_channel_topic":
       return quoted(step.topic);
+    case "invoke_chainlet": {
+      const specialty = step.chainletSpecialty?.trim();
+      if (!specialty) return null;
+      return compact(specialty);
+    }
   }
 }
 

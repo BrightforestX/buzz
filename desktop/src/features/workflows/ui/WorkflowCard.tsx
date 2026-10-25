@@ -10,6 +10,7 @@ import {
   Timer,
   Webhook,
   Zap,
+  Link2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
@@ -62,6 +63,7 @@ const ACTION_ICONS: Record<string, LucideIcon> = {
   send_dm: MessageCircle,
   send_message: MessageSquare,
   set_channel_topic: Hash,
+  invoke_chainlet: Link2,
 };
 
 const TRIGGER_ACCENTS: Record<string, string> = {
@@ -80,6 +82,7 @@ const ACTION_ACCENTS: Record<string, string> = {
   send_dm: "border-indigo-300/30 bg-indigo-600 text-white",
   send_message: "border-blue-300/30 bg-blue-600 text-white",
   set_channel_topic: "border-violet-300/30 bg-violet-600 text-white",
+  invoke_chainlet: "border-teal-300/30 bg-teal-600 text-white",
 };
 
 function StatusToggle({

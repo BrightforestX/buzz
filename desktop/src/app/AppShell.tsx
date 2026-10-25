@@ -51,6 +51,7 @@ import { useManagedAgentRuntimeReconciliation } from "@/features/agents/useManag
 import { useAutoRestartPolicy } from "@/features/agents/lib/useAutoRestartPolicy";
 import { usePersonaSync } from "@/features/agents/lib/usePersonaSync";
 import { useAgentObserverIngestion } from "@/features/agents/useAgentObserverIngestion";
+import { usePlatformWorkflowRelayWake } from "@/features/workflows/usePlatformWorkflowRelayWake";
 import { AgentManagementDialogs } from "@/features/agents/ui/AgentManagementDialogs";
 import { RequestedAgentCreateDialogs } from "@/features/agents/ui/RequestedAgentCreateDialogs";
 import {
@@ -151,6 +152,7 @@ export function AppShell() {
     goNewMessage,
     goProjects,
     goPulse,
+    goScenarios,
     goSettings,
     goWorkflows,
     closeSettings,
@@ -205,6 +207,7 @@ export function AppShell() {
   // relay-owned agents join automatically once identity arrives. Adding a
   // guard here would drop managed-agent coverage during startup.
   useAgentObserverIngestion();
+  usePlatformWorkflowRelayWake();
   // Kind 24200 is relay-ephemeral, so reconciliation runs eagerly (not
   // deferred): seeds kind 24200 for fresh identities, no-ops for explicit
   // opt-outs. Frames before the listener opens are permanently lost.
@@ -890,6 +893,7 @@ export function AppShell() {
                           onSelectHome={() => void goHome()}
                           onSelectProjects={() => void goProjects()}
                           onSelectPulse={() => void goPulse()}
+                          onSelectScenarios={() => void goScenarios()}
                           onSelectSettings={handleOpenSettings}
                           onSelectWorkflows={() => void goWorkflows()}
                           onSetPresenceStatus={(status) =>

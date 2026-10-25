@@ -44,6 +44,7 @@ export const NO_RUNTIME_DROPDOWN_VALUE = "__no_runtime__";
 
 const KNOWN_LLM_PROVIDER_IDS = [
   "anthropic",
+  "baseten",
   "databricks",
   "databricks_v2",
   "openai",
@@ -135,6 +136,11 @@ const PROVIDER_CREDENTIAL_CONFIG: Partial<
     secretEnvVar: "OPENROUTER_API_KEY",
     apiKeyLabel: "OpenRouter API Key",
   },
+  baseten: {
+    requiredEnvKeys: ["BASETEN_API_KEY"],
+    secretEnvVar: "BASETEN_API_KEY",
+    apiKeyLabel: "Baseten API Key",
+  },
 };
 
 const DEFAULT_MODEL_OPTION: PersonaModelOption = {
@@ -146,6 +152,7 @@ export const PERSONA_LLM_PROVIDER_OPTIONS: readonly PersonaModelOption[] = [
   { id: "anthropic", label: "Anthropic" },
   { id: "openai", label: "OpenAI" },
   { id: "openai-compat", label: "OpenAI-compatible" },
+  { id: "baseten", label: "Baseten" },
   { id: "openrouter", label: "OpenRouter" },
   { id: "relay-mesh", label: "Buzz shared compute" },
   { id: "databricks", label: "Databricks" },
@@ -307,15 +314,20 @@ export function providerRequiresExplicitModel(
     trimmedProvider === "anthropic" ||
     trimmedProvider === "openai" ||
     trimmedProvider === "openai-compat" ||
-    trimmedProvider === "openrouter"
+    trimmedProvider === "openrouter" ||
+    trimmedProvider === "baseten"
   );
 }
 
 export function providerDisplayLabel(providerId: string) {
   const trimmedProvider = providerId.trim();
-  return trimmedProvider === "relay-mesh"
-    ? "Buzz shared compute"
-    : trimmedProvider;
+  if (trimmedProvider === "relay-mesh") {
+    return "Buzz shared compute";
+  }
+  if (trimmedProvider === "baseten") {
+    return "Baseten";
+  }
+  return trimmedProvider;
 }
 
 export function getDefaultLlmProviderLabel(

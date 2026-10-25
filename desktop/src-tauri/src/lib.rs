@@ -42,6 +42,7 @@ mod relay_admission;
 mod reset;
 mod secret_store;
 mod shutdown;
+mod stack_lifecycle;
 mod team_catalog;
 mod templates;
 mod terminal_runtime;
@@ -229,6 +230,8 @@ pub fn run() {
         .manage(BuilderlabSession::default())
         .manage(BuilderlabLogin::default())
         .manage(commands::pairing::PairingHandle::new())
+        .manage(commands::GlassesBunkerHandle::new())
+        .manage(commands::Lean4LocalHandle::new())
         .manage(terminal_runtime::TerminalSessions::default())
         .manage(archive::sync::ArchiveSyncState::default())
         .manage(native_relay_client::NativeRelayClient::default())
@@ -341,6 +344,9 @@ pub fn run() {
             if let Ok(mut huddle) = state.huddle_state.lock() {
                 huddle.tts_enabled = tts_settings.agent_text_to_speech;
             }
+
+            let agent_mcp_settings = managed_agents::mcp_settings::load_for_app(&app_handle);
+            managed_agents::mcp_settings::sync_runtime_state(&state, &agent_mcp_settings);
 
             // Bring up the runtime-owned shared-compute coordinator before
             // saved agents are restored. Its lifetime is tied to the app, not
@@ -499,6 +505,10 @@ pub fn run() {
             // the next sweep.
             // Skipped in recovery mode — flushing under an ephemeral key would
             // publish events attributed to an identity the user doesn't own.
+            if !recovery_mode {
+                crate::stack_lifecycle::on_app_start(&app_handle);
+            }
+
             if !recovery_mode {
                 let flush_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
@@ -659,6 +669,9 @@ pub fn run() {
             get_event,
             get_events,
             show_native_notification,
+            stack_lifecycle::stack_record_activity,
+            stack_lifecycle::stack_ensure_awake,
+            stack_lifecycle::stack_relay_status,
             #[cfg(target_os = "macos")]
             macos_notifications::take_pending_activations,
             #[cfg(target_os = "macos")]
@@ -707,6 +720,15 @@ pub fn run() {
             stop_managed_agent,
             set_agent_managed_profiles,
             set_thread_scoped_acp_sessions,
+            get_agent_mcp_settings,
+            set_agent_mcp_settings,
+            fetch_mirofish_graph_data,
+            query_scenario_surreal,
+            list_scenario_mirofish_experiments,
+            get_scenario_mirofish_experiment,
+            run_scenario_mirofish_experiment_fixture,
+            run_customer_scenario_fleet,
+            get_scenario_data_stack_status,
             set_managed_agent_start_on_app_launch,
             set_managed_agent_auto_restart,
             delete_managed_agent,
@@ -832,6 +854,13 @@ pub fn run() {
             start_identity_recovery_pairing,
             confirm_pairing_sas,
             cancel_pairing,
+            nip46_start_glasses_bunker,
+            nip46_stop_glasses_bunker,
+            nip46_allow_glasses_client,
+            nip46_get_glasses_bunker_status,
+            lean4_start_local_server,
+            lean4_stop_local_server,
+            lean4_get_local_status,
             apply_workspace,
             validate_repos_dir,
             get_active_workspace,

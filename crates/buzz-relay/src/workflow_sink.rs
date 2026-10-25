@@ -211,12 +211,16 @@ impl ActionSink for RelayActionSink {
         authored_text: &str,
         author_pubkey: &str,
         reply_to: Option<&str>,
+        platform_job_id: Option<&str>,
+        platform_tenant: Option<&str>,
     ) -> Pin<Box<dyn Future<Output = Result<String, ActionSinkError>> + Send + '_>> {
         let channel_id = channel_id.to_owned();
         let text = text.to_owned();
         let authored_text = authored_text.to_owned();
         let author_pubkey = author_pubkey.to_owned();
         let reply_to = reply_to.map(str::to_owned);
+        let platform_job_id = platform_job_id.map(str::to_owned);
+        let platform_tenant = platform_tenant.map(str::to_owned);
 
         Box::pin(async move {
             // 0. Upgrade weak reference — fails only during shutdown.
@@ -388,6 +392,17 @@ impl ActionSink for RelayActionSink {
                 &author_pubkey_hex,
             )?;
 
+            if let Some(job_id) = platform_job_id.filter(|value| !value.trim().is_empty()) {
+                tags.push(Tag::parse(["buzz:platform-job-id", &job_id]).map_err(|e| {
+                    ActionSinkError::EventBuild(format!("platform job id tag: {e}"))
+                })?);
+            }
+            if let Some(tenant) = platform_tenant.filter(|value| !value.trim().is_empty()) {
+                tags.push(Tag::parse(["buzz:platform-tenant", &tenant]).map_err(|e| {
+                    ActionSinkError::EventBuild(format!("platform tenant tag: {e}"))
+                })?);
+            }
+
             let kind = Kind::from(KIND_STREAM_MESSAGE as u16);
             let event = EventBuilder::new(kind, &text)
                 .tags(tags)
@@ -471,6 +486,30 @@ impl ActionSink for RelayActionSink {
             }
 
             Ok(event_id_hex)
+        })
+    }
+
+    fn invoke_chainlet(
+        &self,
+        specialty: &str,
+        tenant: &str,
+        subject: &str,
+        spec_override: Option<&serde_json::Value>,
+        timeout_secs: u64,
+    ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, ActionSinkError>> + Send + '_>> {
+        let specialty = specialty.to_owned();
+        let tenant = tenant.to_owned();
+        let subject = subject.to_owned();
+        let spec_override = spec_override.cloned();
+        Box::pin(async move {
+            crate::chainlet_client::invoke_chainlet(
+                &specialty,
+                &tenant,
+                &subject,
+                spec_override.as_ref(),
+                timeout_secs,
+            )
+            .await
         })
     }
 }
@@ -1092,6 +1131,8 @@ mod postgres_tests {
                 "root message",
                 &author_hex,
                 None,
+                None,
+                None,
             )
             .await
             .expect("send root");
@@ -1105,6 +1146,8 @@ mod postgres_tests {
                 "threaded reply",
                 &author_hex,
                 Some(&root_hex),
+                None,
+                None,
             )
             .await
             .expect("send reply");
@@ -1248,6 +1291,8 @@ mod postgres_tests {
                 "workflow reply",
                 &author_hex,
                 Some(&parent_hex),
+                None,
+                None,
             )
             .await
             .expect("send reply");
@@ -1330,6 +1375,8 @@ mod postgres_tests {
                 "workflow reply to root-only parent",
                 &author_hex,
                 Some(&root_only_parent_hex),
+                None,
+                None,
             )
             .await
             .expect("send root-only reply");
@@ -1393,6 +1440,8 @@ mod postgres_tests {
                 "orphan reply",
                 &author_hex,
                 Some(&unknown),
+                None,
+                None,
             )
             .await
             .expect_err("reply to a non-existent parent must fail");

@@ -8,6 +8,7 @@ import {
   channelWindowThreadSummaries,
   emptyChannelWindowStore,
   flattenChannelWindowEvents,
+  bumpLiveThreadSummaryFromReply,
   mergeLiveChannelWindowEvent,
   mergeLiveThreadSummary,
   replaceNewestChannelWindow,
@@ -368,6 +369,48 @@ test("live summaries survive scrollback pages and still win for their root", () 
   tail.rows[0].thread = summary(4);
   store = appendOlderChannelWindow(store, tail);
   assert.equal(channelWindowThreadSummaries(store).get(older.id).replyCount, 5);
+});
+
+test("bumpLiveThreadSummaryFromReply increments count and participants", () => {
+  const root = event("a", 100);
+  const first = page(null, [root], { hasMore: false });
+  first.rows[0].thread = summary(2);
+  let store = replaceNewestChannelWindow(emptyChannelWindowStore(), first);
+  const honey = {
+    ...event("honey", 250),
+    pubkey: "f".repeat(64),
+    tags: [
+      ["h", "channel"],
+      ["e", root.id, "", "root"],
+      ["e", root.id, "", "reply"],
+    ],
+  };
+  store = bumpLiveThreadSummaryFromReply(store, root.id, honey);
+  const bumped = channelWindowThreadSummaries(store).get(root.id);
+  assert.equal(bumped.replyCount, 3);
+  assert.equal(bumped.descendantCount, 3);
+  assert.equal(bumped.lastReplyAt, 250);
+  assert.deepEqual(bumped.participantPubkeys, [honey.pubkey, "c".repeat(64)]);
+});
+
+test("bumpLiveThreadSummaryFromReply ignores stale timestamps", () => {
+  const rootId = event("a", 100).id;
+  const store = mergeLiveThreadSummary(
+    emptyChannelWindowStore(),
+    rootId,
+    live(3, 300),
+  );
+  const olderReply = {
+    ...event("late", 200),
+    tags: [
+      ["h", "channel"],
+      ["e", rootId, "", "root"],
+      ["e", rootId, "", "reply"],
+    ],
+  };
+  const unchanged = bumpLiveThreadSummaryFromReply(store, rootId, olderReply);
+  assert.equal(unchanged, store);
+  assert.equal(channelWindowThreadSummaries(store).get(rootId).replyCount, 3);
 });
 
 test("mapChannelWindowEvents rewrites the event everywhere it lives", () => {

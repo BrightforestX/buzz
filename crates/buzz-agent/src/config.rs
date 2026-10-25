@@ -626,6 +626,16 @@ pub struct Config {
     /// Databricks gateway does not auto-cache, so without this the surfaced
     /// `cache_read_input_tokens` is structurally always 0.
     pub prompt_caching: bool,
+    /// When true, `session/new` calls px-validate `validate_proposal` before
+    /// creating a session. Fail-closed on rejection or MCP error.
+    /// Set via `BUZZ_AGENT_ONTOLOGY_GATE=1`.
+    pub ontology_gate: bool,
+    /// LinkML class name passed to ontology preflight `validate_proposal`.
+    /// Default `PlatformJob`. Set via `BUZZ_AGENT_ONTOLOGY_PREFLIGHT_CLASS`.
+    pub ontology_preflight_class: String,
+    /// Timeout for ontology preflight MCP call. Defaults to hook timeout.
+    /// Set via `BUZZ_AGENT_ONTOLOGY_GATE_TIMEOUT_MS`.
+    pub ontology_gate_timeout: Duration,
 }
 
 impl Config {
@@ -736,6 +746,12 @@ impl Config {
             stop_max_rejections: parse_env("BUZZ_AGENT_STOP_MAX_REJECTIONS", 3u32)?,
             require_reply: parse_env("BUZZ_AGENT_REQUIRE_REPLY", 0u8)? != 0,
             hook_servers: parse_hook_servers_env("MCP_HOOK_SERVERS"),
+            ontology_gate: parse_env("BUZZ_AGENT_ONTOLOGY_GATE", 0u8)? != 0,
+            ontology_preflight_class: env_or("BUZZ_AGENT_ONTOLOGY_PREFLIGHT_CLASS", "PlatformJob"),
+            ontology_gate_timeout: {
+                let hook_ms = parse_env("BUZZ_AGENT_HOOK_TIMEOUT_MS", 2500u64)?;
+                Duration::from_millis(parse_env("BUZZ_AGENT_ONTOLOGY_GATE_TIMEOUT_MS", hook_ms)?)
+            },
             databricks_model_filter: DatabricksModelFilter::parse(
                 env("DATABRICKS_MODEL_FILTER").as_deref(),
             )?,
@@ -792,6 +808,9 @@ impl Config {
             stop_max_rejections: 0,
             require_reply: false,
             hook_servers: HookServers::None,
+            ontology_gate: false,
+            ontology_preflight_class: "PlatformJob".into(),
+            ontology_gate_timeout: Duration::from_secs(1),
             databricks_model_filter,
             hints_enabled: false,
             thinking_effort: None,

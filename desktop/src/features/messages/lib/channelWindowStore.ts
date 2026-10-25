@@ -176,6 +176,44 @@ export function mergeLiveThreadSummary(
   };
 }
 
+function bumpParticipantPubkeys(existing: string[], pubkey: string): string[] {
+  const lower = pubkey.toLowerCase();
+  const without = existing.filter(
+    (candidate) => candidate.toLowerCase() !== lower,
+  );
+  return [pubkey, ...without].slice(0, 3);
+}
+
+/**
+ * Increment the live thread summary for a root when a reply is observed
+ * client-side before (or without) a relay kind:39005 push.
+ */
+export function bumpLiveThreadSummaryFromReply(
+  current: ChannelWindowStore,
+  rootId: string,
+  replyEvent: RelayEvent,
+): ChannelWindowStore {
+  const base = channelWindowThreadSummaries(current).get(rootId) ?? {
+    replyCount: 0,
+    descendantCount: 0,
+    lastReplyAt: null,
+    participantPubkeys: [],
+  };
+  const nextCount = base.descendantCount + 1;
+  return mergeLiveThreadSummary(current, rootId, {
+    summary: {
+      replyCount: nextCount,
+      descendantCount: nextCount,
+      lastReplyAt: replyEvent.created_at,
+      participantPubkeys: bumpParticipantPubkeys(
+        base.participantPubkeys,
+        replyEvent.pubkey,
+      ),
+    },
+    createdAt: replyEvent.created_at,
+  });
+}
+
 /**
  * Merge a live top-level event without mutating authoritative page boundaries.
  * Events below an open oldest boundary wait for ordinary relay pagination.

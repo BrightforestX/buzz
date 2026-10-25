@@ -291,6 +291,11 @@ fn resolve_effective_agent_env_with_def(
         effective_provider.as_deref(),
         effective_model.as_deref(),
     );
+    super::apply_baseten_env(
+        &mut env,
+        effective_provider.as_deref(),
+        effective_model.as_deref(),
+    );
 
     EffectiveAgentEnv {
         env,
@@ -524,12 +529,20 @@ fn buzz_agent_requirements(effective: &EffectiveAgentEnv) -> Vec<Requirement> {
                     key: "ANTHROPIC_API_KEY".to_string(),
                 });
             }
-        Some("openai")
-            if env_key_missing("OPENAI_COMPAT_API_KEY") => {
-                missing.push(Requirement::EnvKey {
-                    key: "OPENAI_COMPAT_API_KEY".to_string(),
-                });
-            }
+        Some("openai") if env_key_missing("OPENAI_COMPAT_API_KEY") => {
+            let key = if effective
+                .env
+                .get(super::BASETEN_NATIVE_ENV_MARKER)
+                .is_some_and(|value| value == "1")
+            {
+                "BASETEN_API_KEY"
+            } else {
+                "OPENAI_COMPAT_API_KEY"
+            };
+            missing.push(Requirement::EnvKey {
+                key: key.to_string(),
+            });
+        }
         Some("databricks") | Some("databricks_v2") | Some("databricks-v2")
             // DATABRICKS_HOST is hard-required; DATABRICKS_TOKEN is optional
             // (OAuth PKCE is the normal path — see buzz-agent/src/config.rs:143).

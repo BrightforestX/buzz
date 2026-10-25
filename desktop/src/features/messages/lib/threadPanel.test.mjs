@@ -701,3 +701,29 @@ test("buildMainTimelineEntries merges local knowledge over the relay floor", () 
     ["relay", "local"],
   );
 });
+
+test("buildMainTimelineEntries surfaces bumped live relay summary for thread badge", () => {
+  const root = message({ id: "root", createdAt: 1 });
+  const honeyPk = "f".repeat(64);
+  const fizzPk = "e".repeat(64);
+  const pollenPk = "d".repeat(64);
+  const relaySummaries = new Map([
+    [
+      "root",
+      {
+        replyCount: 3,
+        descendantCount: 3,
+        lastReplyAt: 300,
+        participantPubkeys: [honeyPk, fizzPk, pollenPk],
+      },
+    ],
+  ]);
+
+  const [entry] = buildMainTimelineEntries([root], new Set(), relaySummaries);
+
+  assert.equal(entry.summary?.replyCount, 3);
+  assert.deepEqual(
+    entry.summary?.participants.map((participant) => participant.id),
+    [pollenPk, fizzPk, honeyPk],
+  );
+});

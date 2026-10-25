@@ -19,6 +19,7 @@ mod str_replace;
 mod todo;
 mod tree;
 mod view_image;
+mod workflows;
 
 #[derive(Clone)]
 struct DevMcp {
@@ -120,6 +121,28 @@ impl DevMcp {
         Parameters(_): Parameters<todo::HookParams>,
     ) -> Result<CallToolResult, ErrorData> {
         todo::text_result(self.todos.post_compact())
+    }
+
+    #[tool(
+        name = "create_workflow",
+        description = "Create a Buzz channel workflow from YAML (kind:30620 on relay). Requires BUZZ_RELAY_URL and BUZZ_PRIVATE_KEY."
+    )]
+    async fn create_workflow(
+        &self,
+        Parameters(p): Parameters<workflows::CreateWorkflowParams>,
+    ) -> Result<String, ErrorData> {
+        workflows::create_workflow(p).await
+    }
+
+    #[tool(
+        name = "trigger_workflow",
+        description = "Trigger an existing workflow run by workflow UUID. Optional inputs_json object string for webhook body fields."
+    )]
+    async fn trigger_workflow(
+        &self,
+        Parameters(p): Parameters<workflows::TriggerWorkflowParams>,
+    ) -> Result<String, ErrorData> {
+        workflows::trigger_workflow(p).await
     }
 }
 

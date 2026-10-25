@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Wrap cargo during `just dev` — forwards to real cargo.
+#
+# buzz-desktop debug codesign runs via dev-macos-linker.sh (on link) and
+# desktop/src-tauri/build.rs (async scheduler). Post-cargo signing was removed
+# so unrelated builds (e.g. cargo build -p buzz-agent) do not trigger Keychain ACL refresh.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+REAL_CARGO=""
+while IFS= read -r candidate; do
+  [[ -z "$candidate" ]] && continue
+  if [[ "$candidate" != "$0" && "$candidate" != "$SCRIPT_DIR/cargo" ]]; then
+    REAL_CARGO="$candidate"
+    break
+  fi
+done < <(which -a cargo 2>/dev/null || true)
+
+if [[ -z "$REAL_CARGO" ]]; then
+  # Fallback: drop this wrapper from PATH, then resolve cargo once.
+  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vFx "$SCRIPT_DIR" | paste -sd: -)"
+  REAL_CARGO="$(command -v cargo 2>/dev/null || true)"
+fi
+
+if [[ -z "$REAL_CARGO" ]]; then
+  echo "cargo-dev-wrapper: real cargo not found on PATH" >&2
+  exit 127
+fi
+
+exec "$REAL_CARGO" "$@"

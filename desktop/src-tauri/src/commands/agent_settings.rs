@@ -4,8 +4,9 @@ use tauri::{AppHandle, Manager, State};
 use crate::{
     app_state::AppState,
     managed_agents::{
-        current_instance_id, find_managed_agent_mut, load_managed_agents, save_managed_agents,
-        sync_managed_agent_processes, ManagedAgentSummary,
+        current_instance_id, find_managed_agent_mut, load_managed_agents,
+        mcp_settings::{self, AgentMcpSettingsView},
+        save_managed_agents, sync_managed_agent_processes, ManagedAgentSummary,
     },
     util::now_iso,
 };
@@ -22,6 +23,28 @@ pub fn set_thread_scoped_acp_sessions(enabled: bool, state: State<'_, AppState>)
     state
         .thread_scoped_acp_sessions_enabled()
         .store(enabled, Ordering::Release);
+}
+
+#[tauri::command]
+pub fn get_agent_mcp_settings(state: State<'_, AppState>) -> AgentMcpSettingsView {
+    mcp_settings::build_settings_view(state.inner())
+}
+
+#[tauri::command]
+pub fn set_agent_mcp_settings(
+    chain_mcp_enabled: bool,
+    mirofish_mcp_enabled: bool,
+    mirofish_base_url: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<AgentMcpSettingsView, String> {
+    mcp_settings::persist_agent_mcp_settings(
+        &app,
+        state.inner(),
+        chain_mcp_enabled,
+        mirofish_mcp_enabled,
+        mirofish_base_url,
+    )
 }
 
 #[tauri::command]

@@ -16,6 +16,7 @@ use crate::mcp::McpRegistry;
 use crate::mcp::ResultBudget;
 use crate::permission::PermissionDecision;
 
+use crate::shell_recovery::recover_shell_tool_calls;
 use crate::types::{
     AgentError, CacheTotalState, ContentBlock, HistoryItem, PricingIdentity, ProviderStop,
     SessionUsageBaseline, StopReason, ToolCall, ToolResult, ToolResultContent, TurnIOState,
@@ -430,7 +431,7 @@ impl RunCtx<'_> {
                     }
                 } => unreachable!(),
             };
-            let response = match response_result {
+            let mut response = match response_result {
                 Ok(response) => response,
                 Err(AgentError::UnsupportedImageInput(detail)) => {
                     let removed = replace_unsupported_images(self.history);
@@ -502,6 +503,7 @@ impl RunCtx<'_> {
                 }
                 Err(error) => return Err(error),
             };
+            recover_shell_tool_calls(&mut response, self.mcp);
             // Record provider-reported input usage so the next loop iteration's
             // handoff gate can compare it against the token budget. We capture
             // it together with the history byte size AT THIS MOMENT — which is

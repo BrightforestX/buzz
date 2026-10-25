@@ -1,0 +1,159 @@
+# Canonical test registry for Buzz durable agent platform (spec 011).
+# Picks next open row via .gsd/STATE.md active slice — not random.
+version: 1
+upstream_spec: ../../06-pipelines/specs/010-durable-agent-platform/spec.md
+local_spec: specs/011-buzz-durable-agent-platform/spec.md
+
+cases:
+  - id: PRODUCT-B-agent-dispatch
+    mode: GREEN
+    surface: both
+    slice: S01
+    upstream_us: US1
+    invariant: null
+    charter: B
+    eval_id: buzz_workflow_agent_dispatch
+    pytest: null
+    vitest: desktop/src/features/agents/lib/agentConfigCore.test.mjs
+    playwright: desktop/tests/e2e/onboarding-agent-defaults.spec.ts
+    rust_test: crates/buzz-agent/tests/ontology_gate.rs
+    bdd_feature: ontology-flow/features/ontology-preflight.feature
+    data_source: agent_config
+    status: covered
+
+  - id: PRODUCT-B-daytona-do
+    mode: GREEN
+    surface: both
+    slice: S02
+    upstream_us: US2
+    invariant: M-T2
+    charter: B
+    eval_id: buzz_daytona_do_handoff
+    pytest: null
+    vitest: null
+    playwright: desktop/tests/e2e/agents.spec.ts
+    rust_test: null
+    upstream_smoke: ../../06-pipelines/specs/010-durable-agent-platform/scripts/smoke-daytona-operator.sh
+    data_source: remote_backend
+    status: covered
+
+  - id: PRODUCT-B-baseten-think
+    mode: GREEN
+    surface: both
+    slice: S03
+    upstream_us: US3
+    invariant: M-B1
+    charter: B
+    eval_id: buzz_baseten_transport
+    pytest: null
+    vitest: null
+    playwright: null
+    rust_test: desktop/src-tauri/src/managed_agents/baseten.rs
+    data_source: agent_spawn
+    status: open
+
+  - id: PRODUCT-B-formal-hooks
+    mode: RED
+    surface: both
+    slice: S04
+    upstream_us: US4
+    invariant: M-F1
+    charter: B
+    eval_id: buzz_mcp_hook_stop_gate
+    pytest: null
+    vitest: null
+    playwright: null
+    rust_test: crates/buzz-agent/tests/regressions.rs
+    upstream_smoke: ../../06-pipelines/specs/010-durable-agent-platform/scripts/smoke-platform-loop.sh
+    buzz_smoke: scripts/smoke-formal-gate.sh
+    data_source: mcp_hooks
+    status: covered
+
+  - id: PRODUCT-B-temporal-handoff
+    mode: GREEN
+    surface: both
+    slice: S05
+    upstream_us: US5
+    invariant: M-T1
+    charter: B
+    eval_id: buzz_temporal_handoff
+    pytest: null
+    vitest: null
+    playwright: null
+    rust_test: crates/buzz-workflow/src/schema.rs
+    data_source: workflow
+    status: open
+
+  - id: PRODUCT-B-buzz-durable-agent-platform
+    mode: PRODUCT
+    surface: both
+    slice: S06
+    upstream_us: US6
+    invariant: null
+    charter: B
+    eval_id: buzz_platform_e2e
+    pytest: null
+    vitest: null
+    playwright: desktop/tests/e2e/agents.spec.ts
+    playwright_wire: desktop/tests/e2e/platform-closed-loop.spec.ts
+    rust_test: null
+    upstream_smoke: ../../06-pipelines/specs/010-durable-agent-platform/scripts/smoke-platform-loop.sh
+    data_source: agent_brain
+    status: covered
+
+  - id: PRODUCT-B-welcome-chainlet-channel
+    mode: PRODUCT
+    surface: both
+    slice: S07
+    upstream_us: US3
+    invariant: M-T1
+    charter: B
+    eval_id: buzz_welcome_chainlet_product_channel
+    pytest: null
+    vitest: null
+    playwright: desktop/tests/e2e/platform-closed-loop.spec.ts
+    rust_test: null
+    data_source: welcome_team_chainlet_registry
+    channel_id: 28c8bf26-10fa-42e7-b658-38092562bfe1
+    registry: ../gpu-inference-stack/config/welcome-team-chainlet-registry.yaml
+    doc: specs/011-buzz-durable-agent-platform/docs/product-development-channel.md
+    status: open
+
+  - id: PRODUCT-B-platform-dev-agents
+    mode: PRODUCT
+    surface: both
+    slice: S07
+    upstream_us: US3
+    invariant: M-T1
+    charter: B
+    eval_id: buzz_platform_dev_agent_personas
+    pytest: null
+    vitest: null
+    playwright: desktop/tests/e2e/platform-closed-loop.spec.ts
+    rust_test: desktop/src-tauri/src/managed_agents/chainlet_registry.rs
+    data_source: platform_dev_agent_registry
+    channel_id: 28c8bf26-10fa-42e7-b658-38092562bfe1
+    registry: ../gpu-inference-stack/config/platform-dev-agent-registry.yaml
+    personas:
+      - builtin:chain
+      - builtin:tempo
+      - builtin:sandbox
+      - builtin:gate
+      - builtin:e2e
+    doc: specs/011-buzz-durable-agent-platform/docs/product-development-channel.md
+    status: open
+
+  - id: PHASE0-buzz-scaffold
+    mode: GREEN
+    surface: docs
+    slice: P0
+    upstream_us: null
+    invariant: null
+    charter: B
+    eval_id: buzz_phase0_checklist
+    pytest: null
+    vitest: null
+    playwright: null
+    rust_test: null
+    data_source: docs
+    status: covered

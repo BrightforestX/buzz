@@ -1,0 +1,55 @@
+{
+  "project": "buzz-durable-agent-platform",
+  "gsd_variant": "opengsd-spirit + gsd-2-local",
+  "refs": {
+    "state": ".gsd/STATE.md",
+    "decisions": ".gsd/DECISIONS.md",
+    "test_manifest": "ontology-flow/test-manifest.yaml",
+    "spec": "specs/011-buzz-durable-agent-platform/spec.md",
+    "spec_plan": "specs/011-buzz-durable-agent-platform/plan.md",
+    "spec_tasks": "specs/011-buzz-durable-agent-platform/tasks.md",
+    "spec_checklist": "specs/011-buzz-durable-agent-platform/checklists/requirements.md",
+    "upstream_platform_spec": "../../06-pipelines/specs/010-durable-agent-platform/spec.md",
+    "upstream_platform_plan": "../../06-pipelines/specs/010-durable-agent-platform/plan.md",
+    "upstream_platform_tasks": "../../06-pipelines/specs/010-durable-agent-platform/tasks.md",
+    "upstream_cross_repo_map": "../../06-pipelines/specs/010-durable-agent-platform/docs/cross-repo-map.md",
+    "upstream_gsd_state": "../../06-pipelines/.gsd/STATE.md",
+    "upstream_constitution": "../../06-pipelines/.specify/memory/constitution.md",
+    "cloud_agent_gsd": "../cloud-agent/.gsd/STATE.md",
+    "cloud_agent_daytona_tools": "../cloud-agent/src/mastra/tools/daytona-tools.ts",
+    "cloud_agent_mastra_mcp": "../cloud-agent/scripts/run-mastra-mcp.sh",
+    "baseten_chain_mcp": "../../baseten-chain-mcp/.gsd/STATE.md",
+    "chain_ids": "../gpu-inference-stack/config/baseten-chain-ids.json",
+    "chain_portfolio": "../gpu-inference-stack/config/baseten-chain-portfolio.yaml",
+    "formal_canonical": "../../../../Brightforest/projects/tools/px-validate/formal/",
+    "formal_upstream_local": "../../06-pipelines/formal/run.sh",
+    "agent_brain": "../../06-pipelines/agent-brain/",
+    "mcp_hooks_doc": "docs/MCP_DRIVEN_HOOKS.md",
+    "agents_feature_agents": "desktop/src/features/agents/AGENTS.md",
+    "baseten_rs": "desktop/src-tauri/src/managed_agents/baseten.rs",
+    "buzz_agent_readme": "crates/buzz-agent/README.md",
+    "buzz_workflow_schema": "crates/buzz-workflow/src/schema.rs",
+    "constitution": ".specify/memory/constitution.md"
+  },
+  "workflow": {
+    "always_read_first": [
+      ".gsd/STATE.md",
+      "specs/011-buzz-durable-agent-platform/spec.md",
+      "../../06-pipelines/specs/010-durable-agent-platform/spec.md"
+    ],
+    "evidence_dir": ".gsd/evidence",
+    "no_fabricated_secrets": true
+  },
+  "milestones": ["M-buzz-platform"],
+  "verification": {
+    "gates": [
+      "just ci",
+      "cargo test --manifest-path desktop/src-tauri/Cargo.toml baseten"
+    ],
+    "platform_gates": [
+      "bash ../../06-pipelines/specs/010-durable-agent-platform/scripts/smoke-platform-loop.sh",
+      "bash ../../06-pipelines/specs/010-durable-agent-platform/scripts/smoke-daytona-operator.sh",
+      "bash ../../06-pipelines/formal/run.sh"
+    ]
+  }
+}

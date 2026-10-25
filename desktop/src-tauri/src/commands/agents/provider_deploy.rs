@@ -6,7 +6,8 @@ use crate::{
     app_state::AppState,
     managed_agents::{
         discover_provider_candidates, load_managed_agents, provider_deploy,
-        resolve_provider_binary, save_managed_agents, BackendKind, REPLAY_FLOOR_ENV_VAR,
+        resolve_provider_binary, save_managed_agents, BackendKind, PlatformJobContext,
+        PLATFORM_JOB_ID_ENV_VAR, PLATFORM_TENANT_ENV_VAR, REPLAY_FLOOR_ENV_VAR,
     },
     util::now_iso,
 };
@@ -50,6 +51,7 @@ pub(crate) async fn deploy_to_provider(
     expected_relay_url: Option<&str>,
     expected_signer_pubkey: Option<&str>,
     replay_floor_unix: Option<u64>,
+    platform_job: Option<PlatformJobContext>,
 ) -> Result<(), String> {
     let deploy_lock = {
         let mut locks = state
@@ -94,6 +96,7 @@ pub(crate) async fn deploy_to_provider(
     // The floor is invocation state, not record state, so the post-lock
     // rebuild cannot restore it — inject it into the payload actually invoked.
     apply_replay_floor(&mut agent_json, replay_floor_unix);
+    apply_platform_job(&mut agent_json, platform_job.as_ref());
     // Resolve via discovered candidates only. Cached path must match BOTH
     // "is a discovered candidate" AND "belongs to this provider_id". A tampered
     // record cannot redirect deploys to a different provider's binary.
@@ -219,6 +222,56 @@ fn apply_replay_floor(agent_json: &mut serde_json::Value, replay_floor_unix: Opt
                 serde_json::json!({ (REPLAY_FLOOR_ENV_VAR): floor.to_string() }),
             );
         }
+    }
+}
+
+/// Inject platform job correlation into `launch.policy_env`, mirroring
+/// [`apply_platform_job_env`] on the local spawn path.
+fn apply_platform_job(
+    agent_json: &mut serde_json::Value,
+    platform_job: Option<&PlatformJobContext>,
+) {
+    let Some(ctx) = platform_job else {
+        return;
+    };
+    let Some(launch) = agent_json
+        .get_mut("launch")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    if let Some(env) = launch
+        .get_mut("env")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        for key in [PLATFORM_JOB_ID_ENV_VAR, PLATFORM_TENANT_ENV_VAR] {
+            let shadowed: Vec<String> = env
+                .keys()
+                .filter(|name| name.eq_ignore_ascii_case(key))
+                .cloned()
+                .collect();
+            for name in shadowed {
+                env.remove(&name);
+            }
+        }
+    }
+    let policy_env = launch
+        .entry("policy_env")
+        .or_insert_with(|| serde_json::json!({}));
+    let Some(policy_env) = policy_env.as_object_mut() else {
+        return;
+    };
+    policy_env.insert(
+        PLATFORM_JOB_ID_ENV_VAR.to_string(),
+        serde_json::Value::String(ctx.job_id.clone()),
+    );
+    if let Some(tenant) = &ctx.tenant {
+        policy_env.insert(
+            PLATFORM_TENANT_ENV_VAR.to_string(),
+            serde_json::Value::String(tenant.clone()),
+        );
+    } else {
+        policy_env.remove(PLATFORM_TENANT_ENV_VAR);
     }
 }
 
@@ -464,5 +517,23 @@ mod tests {
         assert_eq!(error, "provider unavailable");
         assert!(record.provider_policy_pending);
         assert_eq!(record.last_error.as_deref(), Some("provider unavailable"));
+    }
+
+    #[test]
+    fn caller_platform_job_rides_launch_policy_env() {
+        let mut payload = launch_payload();
+        let ctx = PlatformJobContext {
+            job_id: "job-e2e-mock-001".into(),
+            tenant: Some("test-community".into()),
+        };
+        apply_platform_job(&mut payload, Some(&ctx));
+        assert_eq!(
+            payload["launch"]["policy_env"]["BUZZ_PLATFORM_JOB_ID"],
+            "job-e2e-mock-001"
+        );
+        assert_eq!(
+            payload["launch"]["policy_env"]["BUZZ_PLATFORM_TENANT"],
+            "test-community"
+        );
     }
 }

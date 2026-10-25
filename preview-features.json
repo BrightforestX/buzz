@@ -2,6 +2,13 @@
   "version": 1,
   "features": [
     {
+      "id": "scenarios",
+      "name": "Scenarios",
+      "description": "MiroFish scenario graph and Trino/Surreal-backed discussion context",
+      "defaultEnabled": true,
+      "platforms": ["desktop"]
+    },
+    {
       "id": "workflows",
       "name": "Workflows",
       "description": "YAML-defined automations with approval gates",

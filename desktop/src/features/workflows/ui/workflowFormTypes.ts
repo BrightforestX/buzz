@@ -37,6 +37,7 @@ export const ACTION_TYPES = [
   "request_approval",
   "add_reaction",
   "set_channel_topic",
+  "invoke_chainlet",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -44,6 +45,7 @@ export const SELECTABLE_ACTION_TYPES = [
   "send_message",
   "delay",
   "call_webhook",
+  "invoke_chainlet",
 ] as const satisfies readonly ActionType[];
 
 export type TriggerConfig = {
@@ -80,6 +82,10 @@ export type StepFormState = {
   from?: string;
   message?: string;
   timeout?: string;
+  chainletSpecialty?: string;
+  chainletTenant?: string;
+  chainletSubject?: string;
+  chainletNotifyChannel?: boolean;
 };
 
 export type WorkflowFormState = {
@@ -114,6 +120,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   request_approval: "Request Approval",
   add_reaction: "Add Reaction",
   set_channel_topic: "Set Channel Topic",
+  invoke_chainlet: "Invoke Chainlet (relay)",
 };
 
 function toHeaderRows(
@@ -191,6 +198,12 @@ function actionFieldsForStep(step: StepFormState): Record<string, unknown> {
       break;
     case "set_channel_topic":
       if (step.topic) fields.topic = step.topic;
+      break;
+    case "invoke_chainlet":
+      if (step.chainletSpecialty) fields.specialty = step.chainletSpecialty;
+      if (step.chainletTenant) fields.tenant = step.chainletTenant;
+      if (step.chainletSubject) fields.subject = step.chainletSubject;
+      if (step.chainletNotifyChannel) fields.notify_channel = true;
       break;
   }
   return fields;
@@ -314,6 +327,14 @@ const ACTION_STEP_KEYS: Record<ActionType, ReadonlySet<string>> = {
   ]),
   add_reaction: new Set([...COMMON_STEP_KEYS, "emoji"]),
   set_channel_topic: new Set([...COMMON_STEP_KEYS, "topic"]),
+  invoke_chainlet: new Set([
+    ...COMMON_STEP_KEYS,
+    "specialty",
+    "tenant",
+    "subject",
+    "spec",
+    "notify_channel",
+  ]),
 };
 const REQUIRED_ACTION_STRING_KEYS: Record<ActionType, readonly string[]> = {
   delay: ["duration"],
@@ -323,6 +344,7 @@ const REQUIRED_ACTION_STRING_KEYS: Record<ActionType, readonly string[]> = {
   request_approval: ["from", "message"],
   add_reaction: ["emoji"],
   set_channel_topic: ["topic"],
+  invoke_chainlet: ["specialty"],
 };
 const OPTIONAL_ACTION_STRING_KEYS: Record<ActionType, readonly string[]> = {
   delay: [],
@@ -332,6 +354,7 @@ const OPTIONAL_ACTION_STRING_KEYS: Record<ActionType, readonly string[]> = {
   request_approval: ["timeout"],
   add_reaction: [],
   set_channel_topic: [],
+  invoke_chainlet: ["tenant", "subject"],
 };
 const WEBHOOK_METHODS = new Set(["POST", "GET", "PUT", "PATCH", "DELETE"]);
 const STEP_ID_PATTERN_STRICT = /^[A-Za-z0-9_]{1,64}$/;
@@ -634,6 +657,10 @@ export function yamlToFormState(
         from: step.from as string | undefined,
         message: step.message as string | undefined,
         timeout: step.timeout as string | undefined,
+        chainletSpecialty: step.specialty as string | undefined,
+        chainletTenant: step.tenant as string | undefined,
+        chainletSubject: step.subject as string | undefined,
+        chainletNotifyChannel: step.notify_channel === true,
       });
     }
 

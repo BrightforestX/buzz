@@ -11,7 +11,9 @@ pub(crate) use agent_env::{
 mod agent_description;
 pub(crate) use agent_description::{effective_agent_description, record_effective_description};
 mod backend;
+mod baseten;
 pub(crate) mod bestie_assignment;
+mod chainlet_registry;
 pub(crate) mod claude_config;
 pub(crate) mod config_bridge;
 pub(crate) mod custom_harnesses;
@@ -22,6 +24,7 @@ mod env_vars;
 pub(crate) mod git_bash;
 pub(crate) mod global_config;
 mod managed_node_paths;
+pub(crate) mod mcp_settings;
 mod nest;
 pub(crate) mod parallelism;
 mod persona_avatars;
@@ -31,6 +34,7 @@ mod personas;
 mod process_lifecycle;
 pub(crate) mod readiness;
 pub(crate) mod reconcile;
+pub(crate) use mcp_settings::AgentMcpRuntimeState;
 mod relay_mesh;
 mod repos;
 mod restore;
@@ -73,6 +77,7 @@ pub(crate) fn lock_env_mutex() -> std::sync::MutexGuard<'static, ()> {
 }
 
 pub use backend::*;
+pub use baseten::*;
 pub(crate) use definition_validation::{
     validate_agent_definition_text, validate_agent_description_text,
     validate_managed_agent_definition_text, validate_visible_text,

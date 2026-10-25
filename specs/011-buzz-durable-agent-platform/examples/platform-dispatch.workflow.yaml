@@ -1,0 +1,72 @@
+# Example: Buzz durable agent platform dispatch via workflow + mention
+# Spec: specs/011-buzz-durable-agent-platform/spec.md (US1 / S01)
+# Validates with: buzz-workflow schema (parse_yaml) — docs stub only
+#
+# Platform phase annotations (maps upstream 010 Think/Do/Verify/Durability):
+#   Dispatch  — workflow trigger + relay fan-out (this file, steps 1–2)
+#   Think     — managed agent LLM turn (buzz-agent + provider env from baseten.rs)
+#   Do        — agent tools / remote backend (buzz-dev-mcp, provider host) — S02
+#   Verify    — MCP hooks at _Stop (_PostCompact) + px-validate — S04
+#   Durability — workflow run row + upstream Temporal handoff — S05
+
+name: platform-agent-dispatch-example
+description: >
+  Posts an @mention to wake a deployed managed agent when a webhook fires.
+  Replace AgentName with a channel member display name; agent must already
+  be deployed (desktop managed_agents) with respond_to policy allowing wake.
+
+enabled: true
+
+# Durability: Webhook trigger persists a workflow_run row before steps execute.
+# Relay: POST /hooks/{workflow_id} with optional JSON body → trigger context.
+#
+# Idempotency / retry (S05 — see contracts/durability-handoff.md):
+#   - Each webhook POST → new workflow_run (no job_id dedup in buzz-workflow).
+#   - Use stable trigger.body.job_id per logical platform job; upstream Temporal
+#     dedupes on workflow id platform:{tenant}:{jobId} (agent-brain, 010 T052).
+#   - Failed runs are NOT auto-retried; re-POST webhook or fix upstream conductor.
+#   - Scheduled triggers use claim_scheduled_workflow_fire (pod-safe, not job_id).
+#
+# Recommended webhook body:
+#   {"job_id":"job-YYYYMMDD-xxx","tenant":"<community-slug>","conductor_url":"..."}
+trigger:
+  on: webhook
+
+steps:
+  # ── Dispatch (platform phase: Dispatch) ──────────────────────────────────
+  # Sends kind:40002 with buzz:workflow-mention tag when @AgentName appears
+  # in BOTH rendered text AND the stored author template (workflow_sink.rs).
+  - id: wake_agent
+    name: Wake platform agent
+    action: send_message
+    text: "@AgentName Please run the platform Think step for job {{trigger.body.job_id}}."
+
+  # ── Think (platform phase: Think) — implicit, not a workflow action ───────
+  # Relay fan-out → ACP harness sees mention → buzz-agent subprocess starts
+  # if agent is deployed + policy allows. Env from Tauri spawn:
+  #   BUZZ_AGENT_PROVIDER, OPENAI_COMPAT_* (Baseten via baseten.rs), model, effort.
+
+  # ── Verify (platform phase: Verify) — implicit in agent loop ─────────────
+  # buzz-agent calls MCP_HOOK_SERVERS hooks at _Stop before end_turn.
+  # Optional: configure px-validate MCP on agent for validate_proposal.
+
+  # ── Do (platform phase: Do) — agent tools, not workflow ────────────────
+  # buzz-dev-mcp / configured MCP tools run inside agent session.
+  # Remote Do (Daytona) requires buzz-backend-* + cloud-agent MCP — see S02.
+
+  # ── Durability (platform phase: Durability) ─────────────────────────────
+  - id: ack_dispatch
+    name: Acknowledge dispatch
+    if: "trigger_body_job_id != ''"
+    action: send_message
+    text: "Platform job {{trigger.body.job_id}} dispatched to @AgentName."
+    reply_in_thread: true
+
+  # Optional external receipt (operator tooling — not Buzz desktop HTTP)
+  - id: notify_upstream
+    name: Notify upstream conductor (optional)
+    if: "trigger_body_conductor_url != ''"
+    action: call_webhook
+    url: "{{trigger.body.conductor_url}}"
+    method: POST
+    body: '{"job_id":"{{trigger.body.job_id}}","phase":"dispatch","source":"buzz-workflow"}'

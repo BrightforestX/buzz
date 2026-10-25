@@ -1,0 +1,28 @@
+# Path B: Headless chainlet invoke (relay executor only — Constitution X.III)
+# No desktop HTTP; buzz-relay runs baseten-chain-mcp relay_invoke subprocess.
+
+name: chainlet-headless-invoke
+description: >
+  Invokes a chainlet specialty directly from the workflow executor on the relay.
+  Optional channel notification when notify_channel is true.
+
+enabled: true
+
+trigger:
+  on: webhook
+
+steps:
+  - id: run_chainlet
+    name: Invoke chainlet on relay
+    action: invoke_chainlet
+    specialty: "{{trigger.body.specialty}}"
+    tenant: "{{trigger.body.tenant}}"
+    subject: "{{trigger.body.job_id}}"
+    notify_channel: true
+
+  - id: ack_headless
+    name: Headless ack
+    if: "trigger_body_job_id != ''"
+    action: send_message
+    text: "Headless chainlet {{trigger.body.specialty}} finished for job {{trigger.body.job_id}}."
+    reply_in_thread: true

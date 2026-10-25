@@ -51,6 +51,58 @@ pub(crate) fn apply_agent_display_env(command: &mut std::process::Command, title
 /// place.
 pub(crate) const REPLAY_FLOOR_ENV_VAR: &str = "BUZZ_ACP_REPLAY_FLOOR";
 
+/// Stable platform job id from a workflow webhook (`trigger.body.job_id`).
+pub(crate) const PLATFORM_JOB_ID_ENV_VAR: &str = "BUZZ_PLATFORM_JOB_ID";
+/// Tenant segment for upstream Temporal id (`platform:{tenant}:{jobId}`).
+pub(crate) const PLATFORM_TENANT_ENV_VAR: &str = "BUZZ_PLATFORM_TENANT";
+
+/// Per-invocation platform job context forwarded to the agent child (not persisted
+/// on the managed-agent record). See `contracts/durability-handoff.md`.
+#[derive(Clone)]
+pub(crate) struct PlatformJobContext {
+    pub job_id: String,
+    pub tenant: Option<String>,
+}
+
+impl PlatformJobContext {
+    pub fn from_parts(job_id: Option<String>, tenant: Option<String>) -> Option<Self> {
+        let job_id = job_id.and_then(|value| {
+            let trimmed = value.trim().to_string();
+            (!trimmed.is_empty()).then_some(trimmed)
+        })?;
+        Some(Self {
+            job_id,
+            tenant: tenant.and_then(|value| {
+                let trimmed = value.trim().to_string();
+                (!trimmed.is_empty()).then_some(trimmed)
+            }),
+        })
+    }
+}
+
+/// Inject platform job correlation env vars after `descriptor.env`, mirroring
+/// [`apply_replay_floor_env`]: caller-supplied values win over user env entries.
+pub(crate) fn apply_platform_job_env(
+    command: &mut std::process::Command,
+    platform_job: Option<&PlatformJobContext>,
+) {
+    match platform_job {
+        Some(ctx) => {
+            command.env(PLATFORM_JOB_ID_ENV_VAR, &ctx.job_id);
+            if let Some(tenant) = &ctx.tenant {
+                command.env(PLATFORM_TENANT_ENV_VAR, tenant);
+            } else {
+                command.env_remove(PLATFORM_TENANT_ENV_VAR);
+            }
+        }
+        None => {
+            command
+                .env_remove(PLATFORM_JOB_ID_ENV_VAR)
+                .env_remove(PLATFORM_TENANT_ENV_VAR);
+        }
+    }
+}
+
 /// Apply the publish-first replay floor: inject [`REPLAY_FLOOR_ENV_VAR`] from
 /// `replay_floor_unix` (or leave the key untouched if `None`).
 ///
@@ -121,7 +173,10 @@ pub(crate) fn child_rust_log_filter() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_replay_floor_env, resolve_session_title, REPLAY_FLOOR_ENV_VAR};
+    use super::{
+        apply_platform_job_env, apply_replay_floor_env, resolve_session_title, PlatformJobContext,
+        PLATFORM_JOB_ID_ENV_VAR, PLATFORM_TENANT_ENV_VAR, REPLAY_FLOOR_ENV_VAR,
+    };
 
     fn replay_floor_of(cmd: &std::process::Command) -> Option<String> {
         cmd.get_envs()
@@ -253,5 +308,52 @@ mod tests {
     #[test]
     fn resolve_session_title_returns_none_when_both_candidates_are_control_chars_only() {
         assert_eq!(resolve_session_title(Some("\u{0}"), "\u{0}"), None);
+    }
+
+    fn env_of(cmd: &std::process::Command, key: &str) -> Option<String> {
+        cmd.get_envs()
+            .find(|(name, _)| *name == std::ffi::OsStr::new(key))
+            .and_then(|(_, value)| value)
+            .map(|value| value.to_string_lossy().into_owned())
+    }
+
+    #[test]
+    fn platform_job_env_injected_when_caller_supplies_context() {
+        let mut cmd = std::process::Command::new("true");
+        let ctx = PlatformJobContext {
+            job_id: "job-e2e-mock-001".into(),
+            tenant: Some("test-community".into()),
+        };
+        apply_platform_job_env(&mut cmd, Some(&ctx));
+        assert_eq!(
+            env_of(&cmd, PLATFORM_JOB_ID_ENV_VAR).as_deref(),
+            Some("job-e2e-mock-001")
+        );
+        assert_eq!(
+            env_of(&cmd, PLATFORM_TENANT_ENV_VAR).as_deref(),
+            Some("test-community")
+        );
+    }
+
+    #[test]
+    fn platform_job_env_wins_over_user_env_collision() {
+        let mut cmd = std::process::Command::new("true");
+        cmd.env(PLATFORM_JOB_ID_ENV_VAR, "stale-job");
+        let ctx = PlatformJobContext {
+            job_id: "job-20260908-abc".into(),
+            tenant: None,
+        };
+        apply_platform_job_env(&mut cmd, Some(&ctx));
+        assert_eq!(
+            env_of(&cmd, PLATFORM_JOB_ID_ENV_VAR).as_deref(),
+            Some("job-20260908-abc")
+        );
+        assert_eq!(env_of(&cmd, PLATFORM_TENANT_ENV_VAR), None);
+    }
+
+    #[test]
+    fn platform_job_context_rejects_blank_job_id() {
+        assert!(PlatformJobContext::from_parts(Some("  ".into()), None).is_none());
+        assert!(PlatformJobContext::from_parts(None, Some("tenant".into())).is_none());
     }
 }

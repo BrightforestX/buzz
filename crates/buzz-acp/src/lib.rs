@@ -5843,61 +5843,77 @@ async fn run_models(args: ModelsArgs) -> Result<()> {
     Ok(())
 }
 
-fn build_mcp_servers(config: &Config) -> Vec<McpServer> {
-    if config.mcp_command.is_empty() {
-        return vec![];
-    }
-    vec![McpServer {
-        name: std::path::Path::new(&config.mcp_command)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("mcp")
-            .to_string(),
-        command: config.mcp_command.clone(),
-        args: vec![],
-        env: {
-            let mut env = vec![
-                EnvVar {
-                    name: "BUZZ_RELAY_URL".into(),
-                    value: config.relay_url.clone(),
-                },
-                EnvVar {
-                    name: "BUZZ_PRIVATE_KEY".into(),
-                    // bech32 encoding of a valid secret key is infallible.
-                    // Panic here is correct: injecting a bogus secret would cause
-                    // delayed, hard-to-diagnose agent failures downstream.
-                    value: config
-                        .keys
-                        .secret_key()
-                        .to_bech32()
-                        .expect("secret key bech32 encoding should never fail"),
-                },
-            ];
-            // Forward BUZZ_AUTH_TAG (NIP-OA owner attestation credential)
-            // so the MCP server can attach it to every signed event.
-            if let Ok(auth_tag) = std::env::var("BUZZ_AUTH_TAG") {
-                if !auth_tag.is_empty() {
-                    env.push(EnvVar {
-                        name: "BUZZ_AUTH_TAG".into(),
-                        value: auth_tag,
-                    });
-                }
-            }
-            // Forward the agent's display name so dev-mcp can use it as the git
-            // author name instead of the raw npub. Read from the process env
-            // rather than Config: this is a pass-through of a contract owned
-            // upstream, and absent simply means dev-mcp falls back to the npub.
-            if let Ok(display_name) = std::env::var("BUZZ_ACP_DISPLAY_NAME") {
-                if !display_name.is_empty() {
-                    env.push(EnvVar {
-                        name: "BUZZ_ACP_DISPLAY_NAME".into(),
-                        value: display_name,
-                    });
-                }
-            }
-            env
+fn mcp_server_env(config: &Config) -> Vec<EnvVar> {
+    let mut env = vec![
+        EnvVar {
+            name: "BUZZ_RELAY_URL".into(),
+            value: config.relay_url.clone(),
         },
-    }]
+        EnvVar {
+            name: "BUZZ_PRIVATE_KEY".into(),
+            value: config
+                .keys
+                .secret_key()
+                .to_bech32()
+                .expect("secret key bech32 encoding should never fail"),
+        },
+    ];
+    if let Ok(auth_tag) = std::env::var("BUZZ_AUTH_TAG") {
+        if !auth_tag.is_empty() {
+            env.push(EnvVar {
+                name: "BUZZ_AUTH_TAG".into(),
+                value: auth_tag,
+            });
+        }
+    }
+    if let Ok(display_name) = std::env::var("BUZZ_ACP_DISPLAY_NAME") {
+        if !display_name.is_empty() {
+            env.push(EnvVar {
+                name: "BUZZ_ACP_DISPLAY_NAME".into(),
+                value: display_name,
+            });
+        }
+    }
+    if !config.mirofish_base_url.is_empty() {
+        env.push(EnvVar {
+            name: "MIROFISH_BASE_URL".into(),
+            value: config.mirofish_base_url.clone(),
+        });
+    }
+    env
+}
+
+fn build_mcp_servers(config: &Config) -> Vec<McpServer> {
+    let mut servers = Vec::new();
+    if !config.mcp_command.is_empty() {
+        servers.push(McpServer {
+            name: std::path::Path::new(&config.mcp_command)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mcp")
+                .to_string(),
+            command: config.mcp_command.clone(),
+            args: vec![],
+            env: mcp_server_env(config),
+        });
+    }
+    if !config.chain_mcp_command.is_empty() {
+        servers.push(McpServer {
+            name: "baseten-chain-mcp".into(),
+            command: config.chain_mcp_command.clone(),
+            args: vec![],
+            env: mcp_server_env(config),
+        });
+    }
+    if !config.mirofish_mcp_command.is_empty() {
+        servers.push(McpServer {
+            name: "mirofish-mcp-server".into(),
+            command: config.mirofish_mcp_command.clone(),
+            args: vec![],
+            env: mcp_server_env(config),
+        });
+    }
+    servers
 }
 
 #[cfg(test)]
@@ -9061,6 +9077,9 @@ mod build_mcp_servers_tests {
             agent_command: "goose".into(),
             agent_args: vec!["acp".into()],
             mcp_command: "test-mcp-server".into(),
+            chain_mcp_command: String::new(),
+            mirofish_mcp_command: String::new(),
+            mirofish_base_url: "http://127.0.0.1:5001".into(),
             idle_timeout_secs: config::DEFAULT_IDLE_TIMEOUT_SECS,
             max_turn_duration_secs: config::DEFAULT_MAX_TURN_DURATION_SECS,
             agents: 1,
@@ -9219,6 +9238,19 @@ mod build_mcp_servers_tests {
     }
 
     #[test]
+    fn mirofish_mcp_command_adds_third_server() {
+        let mut config = test_config();
+        config.mirofish_mcp_command = "/opt/mirofish/run-stdio.sh".into();
+        let servers = build_mcp_servers(&config);
+        assert_eq!(servers.len(), 2);
+        assert_eq!(servers[1].name, "mirofish-mcp-server");
+        assert!(
+            servers[1].env.iter().any(|e| e.name == "MIROFISH_BASE_URL"),
+            "MIROFISH_BASE_URL should be forwarded"
+        );
+    }
+
+    #[test]
     fn absolute_path_mcp_command_uses_file_stem_as_name() {
         let mut config = test_config();
         config.mcp_command = "/opt/bin/my-mcp-server".into();
@@ -9287,6 +9319,9 @@ mod error_outcome_emission_tests {
             agent_command: "true".into(),
             agent_args: vec![],
             mcp_command: "test-mcp-server".into(),
+            chain_mcp_command: String::new(),
+            mirofish_mcp_command: String::new(),
+            mirofish_base_url: "http://127.0.0.1:5001".into(),
             idle_timeout_secs: config::DEFAULT_IDLE_TIMEOUT_SECS,
             max_turn_duration_secs: config::DEFAULT_MAX_TURN_DURATION_SECS,
             agents: 1,

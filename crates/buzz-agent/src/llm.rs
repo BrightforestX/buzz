@@ -2614,6 +2614,9 @@ mod tests {
             thinking_effort: None,
             thinking_summary: ThinkingSummary::Auto,
             prompt_caching: true,
+            ontology_gate: false,
+            ontology_preflight_class: "PlatformJob".into(),
+            ontology_gate_timeout: Duration::from_secs(1),
         }
     }
 

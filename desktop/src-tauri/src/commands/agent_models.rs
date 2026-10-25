@@ -491,23 +491,34 @@ async fn discover_openai_compatible_models(
 ) -> Result<Option<AgentModelsResponse>, String> {
     let relay_mesh =
         provider.as_deref().map(str::trim) == Some(crate::managed_agents::RELAY_MESH_PROVIDER_ID);
-    if !relay_mesh && !is_openai_compatible_provider(provider.as_deref()) {
+    let baseten =
+        provider.as_deref().map(str::trim) == Some(crate::managed_agents::BASETEN_PROVIDER_ID);
+    if !relay_mesh && !baseten && !is_openai_compatible_provider(provider.as_deref()) {
         return Ok(None);
+    }
+
+    let mut discovery_env = env.clone();
+    if baseten {
+        crate::managed_agents::apply_baseten_env(
+            &mut discovery_env,
+            Some(crate::managed_agents::BASETEN_PROVIDER_ID),
+            selected_model.as_deref(),
+        );
     }
 
     let api_key = if relay_mesh {
         crate::managed_agents::RELAY_MESH_API_KEY_PLACEHOLDER.to_string()
     } else {
-        match provider.required_env(env, "OPENAI_COMPAT_API_KEY")? {
+        match provider.required_env(&discovery_env, "OPENAI_COMPAT_API_KEY")? {
             Some(api_key) => api_key,
             None => return Ok(None),
         }
     };
-    let redaction_env = redaction_env_with_value(env, "OPENAI_COMPAT_API_KEY", &api_key);
+    let redaction_env = redaction_env_with_value(&discovery_env, "OPENAI_COMPAT_API_KEY", &api_key);
     let url = if relay_mesh {
         format!("{}/models", crate::managed_agents::RELAY_MESH_API_BASE_URL)
     } else {
-        openai_compatible_models_url_for_discovery(env)
+        openai_compatible_models_url_for_discovery(&discovery_env)
     };
     let response = client
         .get(&url)

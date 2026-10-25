@@ -1,6 +1,10 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { StartCommunityOnboardingInput } from "@/features/onboarding/communityOnboarding";
+import {
+  noopTauriUnlisten,
+  waitForTauriIpcReady,
+} from "@/shared/lib/tauriReady";
 
 export type AddCommunityDeepLinkPayload = {
   relayUrl: string;
@@ -128,6 +132,8 @@ async function drainPendingCommunityDeepLinks(deps: DeepLinkDeps) {
 export async function listenForDeepLinks(
   deps: DeepLinkDeps,
 ): Promise<UnlistenFn> {
+  if (!(await waitForTauriIpcReady())) return noopTauriUnlisten;
+
   let drainRunning = false;
   let drainRequested = false;
   const drain = () => {
@@ -172,6 +178,8 @@ let navigationDrainGeneration = 0;
 let navigationDrainEnabled = true;
 
 export async function resetNavigationDeepLinkDrain(): Promise<void> {
+  if (!(await waitForTauriIpcReady())) return;
+
   const generation = ++navigationDrainGeneration;
   // Fail closed while the outgoing community's native queue is being cleared.
   // A rejected clear leaves that queue's identity unknown, so no later listener
@@ -243,6 +251,8 @@ export async function listenForNavigationDeepLinks(
     payload: MessageDeepLinkPayload,
   ) => boolean | Promise<boolean>,
 ): Promise<UnlistenFn> {
+  if (!(await waitForTauriIpcReady())) return noopTauriUnlisten;
+
   let drainRunning = false;
   let drainRequested = false;
   const drain = () => {
@@ -281,9 +291,11 @@ export async function listenForNavigationDeepLinks(
  * links for projects, repositories, issues, and pull requests. The payload is
  * the raw URL; callers parse it with `parseEntityLink` before navigating.
  */
-export function listenForEntityDeepLinks(
+export async function listenForEntityDeepLinks(
   onOpen: (href: string) => boolean,
 ): Promise<UnlistenFn> {
+  if (!(await waitForTauriIpcReady())) return noopTauriUnlisten;
+
   let drainRunning = false;
   let drainRequested = false;
   const drain = () => {
@@ -329,9 +341,11 @@ export function listenForEntityDeepLinks(
   });
 }
 
-export function listenForNostrBindDeepLinks(
+export async function listenForNostrBindDeepLinks(
   onOpen: (payload: NostrBindDeepLinkPayload) => void,
 ): Promise<UnlistenFn> {
+  if (!(await waitForTauriIpcReady())) return noopTauriUnlisten;
+
   return listen<NostrBindDeepLinkPayload>("deep-link-nostr-bind", (event) => {
     onOpen(event.payload);
   });

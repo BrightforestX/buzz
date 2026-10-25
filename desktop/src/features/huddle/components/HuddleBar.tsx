@@ -22,6 +22,7 @@ import type { RelayEvent } from "@/shared/api/types";
 import { KIND_HUDDLE_REACTION } from "@/shared/constants/kinds";
 import { cn } from "@/shared/lib/cn";
 import { rewriteRelayUrl } from "@/shared/lib/mediaUrl";
+import { waitForTauriIpcReady } from "@/shared/lib/tauriReady";
 import { useDocumentVisible } from "@/shared/lib/useDocumentVisible";
 import { Button } from "@/shared/ui/button";
 import { useEmojiBurst } from "@/shared/ui/EmojiBurstProvider";
@@ -242,14 +243,17 @@ export function HuddleBar({
     if (documentVisible) void fetchState();
 
     // Primary: listen for Rust-emitted state change events
-    listen<HuddleState>("huddle-state-changed", (event) => {
-      if (!cancelled) {
-        stateGenerationRef.current += 1;
-        applyIncomingState(event.payload);
-      }
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
+    void waitForTauriIpcReady().then((ready) => {
+      if (!ready || cancelled) return;
+      void listen<HuddleState>("huddle-state-changed", (event) => {
+        if (!cancelled) {
+          stateGenerationRef.current += 1;
+          applyIncomingState(event.payload);
+        }
+      }).then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
     });
 
     // Fallback in case events are missed; keep it slow so normal huddle use is

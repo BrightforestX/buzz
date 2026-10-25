@@ -1,6 +1,12 @@
 pub mod agent_management;
-mod client;
+pub mod client;
 mod commands;
+
+/// Workflow create/trigger helpers for MCP and other in-process callers.
+pub mod workflows {
+    pub use super::client::BuzzClient;
+    pub use super::commands::workflows::{cmd_create_workflow, cmd_trigger_workflow};
+}
 mod error;
 mod links;
 mod validate;

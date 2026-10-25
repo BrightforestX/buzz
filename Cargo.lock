@@ -1107,6 +1107,8 @@ dependencies = [
  "base64 0.22.1",
  "buzz-cli",
  "buzz-core",
+ "buzz-sdk",
+ "buzz-workflow",
  "git-credential-nostr",
  "git-sign-nostr",
  "ignore",
@@ -1158,6 +1160,18 @@ dependencies = [
  "tracing",
  "ulid",
  "uuid",
+]
+
+[[package]]
+name = "buzz-nip46"
+version = "0.1.0"
+dependencies = [
+ "nostr 0.44.7",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

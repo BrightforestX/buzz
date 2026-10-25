@@ -152,6 +152,23 @@ pub enum ActionDef {
         /// Duration string (e.g. `"5m"`, `"1h"`).
         duration: String,
     },
+    /// Headless chainlet execution via relay-side baseten-chain-mcp (Path B).
+    InvokeChainlet {
+        /// Portfolio specialty name (e.g. `ontology-action-draft`).
+        specialty: String,
+        /// Tenant scope for chain job store (supports templates).
+        #[serde(default)]
+        tenant: Option<String>,
+        /// Subject scope for chain job store (supports templates).
+        #[serde(default)]
+        subject: Option<String>,
+        /// Optional full `ChainExecutionSpec` override (JSON object).
+        #[serde(default)]
+        spec: Option<serde_json::Value>,
+        /// When true, post a summary message to the workflow channel on completion.
+        #[serde(default)]
+        notify_channel: bool,
+    },
 }
 
 impl WorkflowDef {
@@ -997,5 +1014,29 @@ mod tests {
             trigger,
             TriggerDef::DiffPosted { filter: Some(_) }
         ));
+    }
+
+    #[test]
+    fn invoke_chainlet_action_roundtrips_yaml() {
+        let yaml = concat!(
+            "name: Headless\n",
+            "trigger:\n  on: webhook\n",
+            "steps:\n",
+            "  - id: run\n",
+            "    action: invoke_chainlet\n",
+            "    specialty: ontology-action-draft\n",
+            "    tenant: \"{{trigger.body.tenant}}\"\n",
+            "    notify_channel: true\n",
+        );
+        let (def, _) = parse_yaml(yaml).expect("invoke_chainlet should parse");
+        match &def.steps[0].action {
+            ActionDef::InvokeChainlet {
+                specialty,
+                tenant: Some(_),
+                notify_channel: true,
+                ..
+            } => assert_eq!(specialty, "ontology-action-draft"),
+            other => panic!("expected InvokeChainlet, got {other:?}"),
+        }
     }
 }

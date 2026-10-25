@@ -30,6 +30,10 @@ export type QueuedAgentWake = {
    * makes the enqueue-to-flush gap arbitrarily long.
    */
   replayFloorUnix: number;
+  /** Stable platform job id when wake originates from a webhook workflow. */
+  platformJobId?: string;
+  /** Tenant segment for upstream Temporal id correlation. */
+  platformTenant?: string;
 };
 
 /** Queue a wake for `agent`, stamping its replay floor now (enqueue time). */

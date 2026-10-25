@@ -238,13 +238,21 @@ export function MessageThreadPanel({
   const replyTargetMessageRef = React.useRef(replyTargetMessage);
   replyTargetMessageRef.current = replyTargetMessage;
 
-  const onCaptureSendContext = React.useCallback(
-    () => ({
+  const onCaptureSendContext = React.useCallback(() => {
+    if (!threadHeadId) {
+      console.error(
+        "MessageThreadPanel: onCaptureSendContext called without threadHeadId",
+      );
+      return {
+        parentEventId: null,
+        threadHeadId: null,
+      };
+    }
+    return {
       parentEventId: replyTargetMessageRef.current?.id ?? threadHeadId,
       threadHeadId,
-    }),
-    [threadHeadId],
-  );
+    };
+  }, [threadHeadId]);
 
   const collapseThreadHeadReplies = React.useCallback(() => {
     if (!threadHeadId) {

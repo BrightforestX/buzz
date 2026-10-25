@@ -1,5 +1,10 @@
 # AGENTS.md — AI Agent Contributor Guide
 
+<!-- Active spec: specs/011-buzz-durable-agent-platform/spec.md -->
+<!-- Session state: .gsd/STATE.md -->
+<!-- Upstream platform: ../../06-pipelines/specs/010-durable-agent-platform/spec.md -->
+<!-- Constitution: .specify/memory/constitution.md (Section X) -->
+
 This guide is for AI agents contributing to the Buzz codebase. It covers
 agent-specific context and conventions. For general contributor info (setup,
 code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).

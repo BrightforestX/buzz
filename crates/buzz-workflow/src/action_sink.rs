@@ -7,6 +7,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use buzz_core::tenant::CommunityId;
+use serde_json::Value as JsonValue;
 
 /// Errors from action sink operations.
 #[derive(Debug, thiserror::Error)]
@@ -63,6 +64,9 @@ pub trait ActionSink: Send + Sync {
     /// - `reply_to`: when `Some(event_id_hex)`, the message is posted as a
     ///   threaded reply to that event (NIP-10 root/reply tags + real thread
     ///   metadata); when `None`, it is a top-level channel message.
+    /// - `platform_job_id` / `platform_tenant`: optional webhook dispatch
+    ///   correlation from `trigger.body.*`; relay attaches as
+    ///   `buzz:platform-job-id` / `buzz:platform-tenant` tags for desktop wake.
     ///
     /// Returns the event ID hex string on success.
     fn send_message(
@@ -73,5 +77,17 @@ pub trait ActionSink: Send + Sync {
         authored_text: &str,
         author_pubkey: &str,
         reply_to: Option<&str>,
+        platform_job_id: Option<&str>,
+        platform_tenant: Option<&str>,
     ) -> Pin<Box<dyn Future<Output = Result<String, ActionSinkError>> + Send + '_>>;
+
+    /// Submit and poll a chainlet job (relay-only Path B).
+    fn invoke_chainlet(
+        &self,
+        specialty: &str,
+        tenant: &str,
+        subject: &str,
+        spec_override: Option<&JsonValue>,
+        timeout_secs: u64,
+    ) -> Pin<Box<dyn Future<Output = Result<JsonValue, ActionSinkError>> + Send + '_>>;
 }

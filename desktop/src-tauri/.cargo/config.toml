@@ -1,0 +1,6 @@
+# Dev-only: stable codesign for buzz-desktop after each debug link (macOS Keychain ACL).
+[target.aarch64-apple-darwin]
+linker = "../../scripts/dev-macos-linker.sh"
+
+[target.x86_64-apple-darwin]
+linker = "../../scripts/dev-macos-linker.sh"

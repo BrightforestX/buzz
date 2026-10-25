@@ -8,6 +8,21 @@ import type { ManagedAgent } from "@/shared/api/types";
 import { normalizePubkey } from "@/shared/lib/pubkey";
 import { getErrorMessage } from "./useMentionSendFlow.helpers";
 
+export type DetachedAgentStartOptions = {
+  replayFloorUnix?: number;
+  platformJobId?: string;
+  platformTenant?: string;
+};
+
+function normalizeDetachedStartOptions(
+  replayFloorUnixOrOptions?: number | DetachedAgentStartOptions,
+): DetachedAgentStartOptions {
+  if (typeof replayFloorUnixOrOptions === "number") {
+    return { replayFloorUnix: replayFloorUnixOrOptions };
+  }
+  return replayFloorUnixOrOptions ?? {};
+}
+
 /**
  * Detached starts still in flight, keyed by the full tenant scope the wake
  * asserts: `(scoped relay URL, expected signer, agent pubkey)`.
@@ -124,7 +139,7 @@ function warnAgentMayNotRespond(agentName: string, detail: string): void {
  */
 export function useDetachedAgentStart(): (
   agent: ManagedAgent,
-  replayFloorUnix?: number,
+  replayFloorUnixOrOptions?: number | DetachedAgentStartOptions,
 ) => boolean {
   const startAgentMutateAsync = useStartManagedAgentMutation().mutateAsync;
   const { activeCommunity } = useCommunities();
@@ -143,7 +158,13 @@ export function useDetachedAgentStart(): (
   const expectedSignerPubkey =
     normalizePubkey(identityQuery.data?.pubkey ?? "") || undefined;
   return React.useCallback(
-    (agent: ManagedAgent, replayFloorUnix?: number) => {
+    (
+      agent: ManagedAgent,
+      replayFloorUnixOrOptions?: number | DetachedAgentStartOptions,
+    ) => {
+      const startOptions = normalizeDetachedStartOptions(
+        replayFloorUnixOrOptions,
+      );
       if (!expectedRelayUrl || !expectedSignerPubkey) {
         // Fail closed: an unscoped start resolves the relay and the signing
         // identity at execution time, so it can land on whichever tenant is
@@ -182,7 +203,10 @@ export function useDetachedAgentStart(): (
         pubkey: agent.pubkey,
         expectedRelayUrl,
         expectedSignerPubkey,
-        replayFloorUnix: replayFloorUnix ?? Math.floor(Date.now() / 1000),
+        replayFloorUnix:
+          startOptions.replayFloorUnix ?? Math.floor(Date.now() / 1000),
+        platformJobId: startOptions.platformJobId,
+        platformTenant: startOptions.platformTenant,
       })
         .catch((error: unknown) => {
           // This settles arbitrarily long after the send, and `<Toaster />`

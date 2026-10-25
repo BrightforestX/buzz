@@ -50,6 +50,9 @@
 //!                              addition to any `FAKE_MCP_TOOL_COUNT` tools. Lets
 //!                              a test issue parallel calls to distinctly named
 //!                              tools and tell them apart in `FAKE_MCP_CALL_LOG`.
+//!   FAKE_MCP_VALIDATE_PROPOSAL=1
+//!                            — expose `validate_proposal` (px-validate mock)
+//!   FAKE_MCP_VALIDATE_FAIL=1  — `validate_proposal` returns ok:false
 
 use std::io::{BufRead, Write};
 
@@ -94,6 +97,7 @@ fn make_tools(
     include_stop_hook: bool,
     include_post_compact_hook: bool,
     include_shell_tool: bool,
+    include_validate_proposal: bool,
     named_tools: &[String],
 ) -> Vec<Value> {
     let mut tools: Vec<Value> = (0..count)
@@ -137,6 +141,21 @@ fn make_tools(
             },
         }));
     }
+    if include_validate_proposal {
+        tools.push(json!({
+            "name": "validate_proposal",
+            "description": "px-validate preflight mock",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "data": { "type": "object" },
+                    "class_name": { "type": "string" },
+                    "check_registry": { "type": "boolean" },
+                },
+                "required": ["data", "class_name"],
+            },
+        }));
+    }
     tools
 }
 
@@ -174,6 +193,8 @@ fn main() {
     let mut stop_calls_seen: usize = 0;
     let post_compact_hook = env_flag("FAKE_MCP_POSTCOMPACT_HOOK");
     let shell_tool = env_flag("FAKE_MCP_SHELL_TOOL");
+    let validate_proposal = env_flag("FAKE_MCP_VALIDATE_PROPOSAL");
+    let validate_fail = env_flag("FAKE_MCP_VALIDATE_FAIL");
     let post_compact_text = std::env::var("FAKE_MCP_POSTCOMPACT_TEXT").unwrap_or_default();
     // One extra no-arg tool per comma-separated bare name.
     let named_tools: Vec<String> = std::env::var("FAKE_MCP_NAMED_TOOLS")
@@ -258,6 +279,7 @@ fn main() {
                             stop_hook,
                             post_compact_hook,
                             shell_tool,
+                            validate_proposal,
                             &named_tools,
                         )
                     }),
@@ -331,6 +353,21 @@ fn main() {
                         id,
                         json!({
                             "content": [{ "type": "text", "text": post_compact_text }],
+                            "isError": false,
+                        }),
+                    );
+                    continue;
+                }
+                if called_name == "validate_proposal" {
+                    let payload = if validate_fail {
+                        json!({"ok": false, "errors": ["preflight rejected"]}).to_string()
+                    } else {
+                        json!({"ok": true}).to_string()
+                    };
+                    write_response(
+                        id,
+                        json!({
+                            "content": [{ "type": "text", "text": payload }],
                             "isError": false,
                         }),
                     );

@@ -1,0 +1,53 @@
+# Buzz relay on DOKS workers-buzz pool (ontology-stack cluster).
+# Install: helm upgrade --install buzz deploy/charts/buzz -n buzz -f deploy/do/ontology-doks-values.yaml
+
+quickstart: true
+
+relayUrl: wss://relay.pathx.ai
+ownerPubkey: ""  # set via --set ownerPubkey=... or BUZZ_OWNER_PUBKEY env at deploy time
+
+postgresql:
+  enabled: true
+  nodeSelector:
+    doks.digitalocean.com/node-pool: workers-buzz
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: buzz
+      effect: NoSchedule
+
+redis:
+  enabled: true
+  nodeSelector:
+    doks.digitalocean.com/node-pool: workers-buzz
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: buzz
+      effect: NoSchedule
+
+minio:
+  enabled: true
+  nodeSelector:
+    doks.digitalocean.com/node-pool: workers-buzz
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: buzz
+      effect: NoSchedule
+
+relay:
+  requireRelayMembership: true
+  nodeSelector:
+    doks.digitalocean.com/node-pool: workers-buzz
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: buzz
+      effect: NoSchedule
+
+migrate:
+  autoMigrate: true
+
+podDisruptionBudget:
+  enabled: false

@@ -17,6 +17,10 @@ BUZZ_KEYCHAIN_ACCESS_GROUP = $(BUNDLE_IDENTIFIER)
 BUZZ_IOS_PUSH_ENVIRONMENT = development
 BUZZ_APP_ATTEST_ENVIRONMENT = development
 
+// Entitlements paths (override in AppOverrides.xcconfig for free personal-team device installs).
+BUZZ_RUNNER_ENTITLEMENTS = Runner/Runner.entitlements
+BUZZ_NOTIFICATION_SERVICE_ENTITLEMENTS = NotificationService/NotificationService.entitlements
+
 // Worktree-aware debug identity (gitignored, written by
 // scripts/mobile-worktree-overrides.sh): a per-worktree bundle identifier
 // and a branch-labelled display name so debug builds from multiple worktrees

@@ -1,0 +1,30 @@
+# PM scenario deliberation — Buzz agent + chainlet + replay PM tools
+# Set BUZZ_SCENARIO_ID and TOOL_BACKEND=replay on the managed agent spawn env.
+
+name: scenario-pm-deliberation
+description: >
+  Runs a PM simulation scenario: agent reads Surreal state via MCP, deliberates
+  with chainlet specialty, proposes candidate actions. PM calls use replay backend.
+
+enabled: true
+
+trigger:
+  on: webhook
+
+steps:
+  - id: invoke_deliberation
+    name: Chainlet deliberation for scenario
+    action: invoke_chainlet
+    specialty: "{{trigger.body.specialty}}"
+    tenant: "{{trigger.body.tenant}}"
+    subject: "{{trigger.body.scenario_id}}"
+    notify_channel: false
+
+  - id: notify_complete
+    name: Scenario deliberation ack
+    if: "trigger_body_scenario_id != ''"
+    action: send_message
+    text: >
+      PM scenario {{trigger.body.scenario_id}} deliberation finished
+      (specialty {{trigger.body.specialty}}, backend replay).
+    reply_in_thread: true

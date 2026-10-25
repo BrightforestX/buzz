@@ -1,0 +1,32 @@
+# Path A: Sequential chainlet pipeline — Fizz (Think) then Honey (Verify)
+# Each step wakes the next persona via @mention; agents run chainlets in-session.
+
+name: chainlet-pipeline-think-verify
+description: >
+  Two-step dispatch: Fizz drafts ontology actions, then Honey runs verify-gate-plan.
+  Use stable job_id in webhook body for upstream Temporal dedup.
+
+enabled: true
+
+trigger:
+  on: webhook
+
+steps:
+  - id: wake_fizz
+    name: Think — Fizz ontology-action-draft
+    action: send_message
+    text: "@Fizz Run chainlet specialty ontology-action-draft for job {{trigger.body.job_id}}."
+
+  - id: wake_honey
+    name: Verify — Honey verify-gate-plan
+    action: send_message
+    if: "trigger_body_job_id != ''"
+    text: "@Honey Run chainlet specialty verify-gate-plan for job {{trigger.body.job_id}} after Fizz completes."
+    reply_in_thread: true
+
+  - id: ack_pipeline
+    name: Pipeline ack
+    if: "trigger_body_job_id != ''"
+    action: send_message
+    text: "Think→Verify pipeline dispatched for {{trigger.body.job_id}}."
+    reply_in_thread: true

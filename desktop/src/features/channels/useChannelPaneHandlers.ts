@@ -363,7 +363,9 @@ export function useChannelPaneHandlers({
         openThreadHeadIdRef.current,
       );
       if (!target) {
-        return;
+        throw new Error(
+          "Couldn't send — thread context was lost. Close and reopen the thread, then try again.",
+        );
       }
       const { parentEventId, threadHeadId: activeThreadHeadId } = target;
 

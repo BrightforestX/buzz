@@ -848,6 +848,7 @@ def test_only_evidence_grading_tasks_fail_on_a_missing_snapshot():
     # tests, so a snapshot hiccup must not turn a real result into an error.
     assert fixture_for("reply-to-thread").requires_evidence
     assert fixture_for("user-mention").requires_evidence
+    assert fixture_for("voice-wake-mention").requires_evidence
     assert fixture_for("read-named-path-outside-workspace").requires_evidence
     assert fixture_for("create-channel-invite-users").requires_evidence
     assert not fixture_for("cobol-modernization").requires_evidence

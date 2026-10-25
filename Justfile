@@ -598,7 +598,12 @@ relay-release: bootstrap _ensure-migrations
 dev *ARGS: bootstrap _ensure-sidecar-stubs _ensure-migrations
     #!/usr/bin/env bash
     set -euo pipefail
-    export PATH="{{justfile_directory()}}/bin:$PATH"
+    export PATH="{{justfile_directory()}}/scripts/cargo-dev-wrapper:{{justfile_directory()}}/bin:$PATH"
+    if [[ "$(uname)" == Darwin ]]; then
+        export CARGO="{{justfile_directory()}}/scripts/cargo-dev-wrapper/cargo"
+        "{{justfile_directory()}}/scripts/ensure-dev-codesign-identity.sh" || true
+        BUZZ_DEV_KEYCHAIN_SETUP_NON_INTERACTIVE=1 "{{justfile_directory()}}/scripts/setup-dev-keychain-once.sh" || true
+    fi
     set -o allexport
     source .env
     set +o allexport
@@ -677,12 +682,18 @@ desktop-standalone *ARGS: _ensure-sidecar-stubs
     source ../scripts/instance-env.sh
     INSTANCE_ID=$(node -e "console.log(JSON.parse(process.env.BUZZ_TAURI_CONFIG).identifier)")
     export BUZZ_DEV_KEYRING_SERVICE="buzz-desktop-dev.${BUZZ_INSTANCE_SLUG:-main}"
+    if [[ "$(uname)" == Darwin ]]; then
+        "../scripts/ensure-dev-codesign-identity.sh" || true
+        BUZZ_DEV_KEYCHAIN_SETUP_NON_INTERACTIVE=1 "../scripts/setup-dev-keychain-once.sh" || true
+    fi
     if [[ -n "{{fresh}}" ]]; then
         ../scripts/reset-desktop-standalone-state.sh "$INSTANCE_ID" "$BUZZ_DEV_KEYRING_SERVICE"
     fi
     trap '../scripts/cleanup-instance-agents.sh "$INSTANCE_ID" || true' EXIT
     echo "Starting standalone desktop on Vite port ${BUZZ_VITE_PORT}; no relay services were started"
-    pnpm exec tauri dev --config "$BUZZ_TAURI_CONFIG" {{ARGS}}
+    TAURI_EXTRA=()
+    [[ "${BUZZ_TAURI_NO_WATCH:-0}" == "1" ]] && TAURI_EXTRA+=(--no-watch)
+    pnpm exec tauri dev --config "$BUZZ_TAURI_CONFIG" "${TAURI_EXTRA[@]}" {{ARGS}}
 
 # Run the desktop app against the internal staging relay (installs deps + builds agent tools automatically)
 staging *ARGS: bootstrap _ensure-sidecar-stubs
@@ -1100,6 +1111,33 @@ _release-pr lane version:
         echo "Release PR opened: ${PR_URL}"
     fi
     echo "Merge it to trigger the release build."
+
+# ─── Stack lifecycle (idle sleep / wake) ───────────────────────────────────────
+
+# Show DOKS cluster, relay, local workers, and stack state
+stack-status *ARGS:
+    ./scripts/stack-status.sh {{ARGS}}
+
+# Sleep all workers (DOKS destroy + stop local harnesses). Requires confirm env or --force.
+stack-sleep *ARGS:
+    ./scripts/stack-sleep.sh {{ARGS}}
+
+# Wake DOKS + local workers (~20–30 min for cloud relay)
+stack-wake *ARGS:
+    ./scripts/stack-wake.sh {{ARGS}}
+
+# 5m agent + relay health loop (recover shim/harnesses; never restart desktop)
+health-loop-start *ARGS:
+    ./scripts/run-agent-health-loop.sh start {{ARGS}}
+
+health-loop-stop:
+    ./scripts/run-agent-health-loop.sh stop
+
+health-loop-status:
+    ./scripts/run-agent-health-loop.sh status
+
+health-loop-tick *ARGS:
+    ./scripts/run-agent-health-loop.sh tick {{ARGS}}
 
 # ─── Agent Harness ────────────────────────────────────────────────────────────
 

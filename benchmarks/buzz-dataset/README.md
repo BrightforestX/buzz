@@ -9,6 +9,7 @@ willing to read.
 | --- | --- | --- |
 | [`reply-to-thread`](reply-to-thread) | Regression | Answers in the user's thread instead of as a new top-level message |
 | [`user-mention`](user-mention) | Regression | Hands the turn back with an event-level `p`-tag mention of the requesting human |
+| [`voice-wake-mention`](voice-wake-mention) | Regression | Replies to a wake-stripped kind:9 ingest (glasses voice bridge) without echoing wake prefixes |
 | [`read-named-path-outside-workspace`](read-named-path-outside-workspace) | Regression | Reads a path the user named explicitly instead of refusing it as out of bounds |
 | [`create-channel-invite-users`](create-channel-invite-users) | Workflow | Creates a channel with the exact shape, TTL, and membership asked for |
 | [`multiline-message`](multiline-message) | Regression | Preserves real newlines and blank-line structure through the CLI publish path |

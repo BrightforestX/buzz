@@ -162,4 +162,36 @@ fn main() {
         ),
     )
     .expect("failed to build Tauri application");
+
+    schedule_dev_codesign_after_link();
 }
+
+#[cfg(target_os = "macos")]
+fn schedule_dev_codesign_after_link() {
+    if std::env::var("PROFILE").as_deref() != Ok("debug") {
+        return;
+    }
+    if std::env::var("BUZZ_DEV_CODESIGN").as_deref() == Ok("0") {
+        return;
+    }
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let bin = format!("{}/target/debug/buzz-desktop", manifest);
+    let scheduler = format!(
+        "{}/../../scripts/schedule-codesign-buzz-desktop.sh",
+        manifest
+    );
+    let signer = format!("{}/../../scripts/codesign-dev-desktop.sh", manifest);
+    if !std::path::Path::new(&scheduler).exists() {
+        return;
+    }
+    let _ = std::process::Command::new(&scheduler)
+        .arg(&bin)
+        .arg(&signer)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn schedule_dev_codesign_after_link() {}

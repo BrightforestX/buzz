@@ -2,6 +2,8 @@
 
 ## Automated Tests
 
+Desktop (Tauri) UI and IPC lanes: see [desktop/TESTING.md](desktop/TESTING.md).
+
 ```bash
 just test-unit          # unit tests — no infrastructure needed
 just test               # unit + integration (starts Docker if needed)

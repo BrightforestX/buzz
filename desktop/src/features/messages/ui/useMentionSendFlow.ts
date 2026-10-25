@@ -588,7 +588,11 @@ export function useMentionSendFlow({
           // each wake carries its enqueue-time replay floor so the spawned
           // harness replays back past this message however late the flush.
           for (const wake of agentsToWake) {
-            startAgentDetached(wake.agent, wake.replayFloorUnix);
+            startAgentDetached(wake.agent, {
+              replayFloorUnix: wake.replayFloorUnix,
+              platformJobId: wake.platformJobId,
+              platformTenant: wake.platformTenant,
+            });
           }
           if (signal?.aborted || isSendCancelled()) return;
           const sentMentionPubkeys = new Set(

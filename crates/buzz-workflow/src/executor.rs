@@ -466,6 +466,19 @@ pub fn resolve_step_templates(
         Delay { duration } => Ok(Delay {
             duration: duration.clone(),
         }),
+        InvokeChainlet {
+            specialty,
+            tenant,
+            subject,
+            spec,
+            notify_channel,
+        } => Ok(InvokeChainlet {
+            specialty: t(specialty)?,
+            tenant: t_opt(tenant)?,
+            subject: t_opt(subject)?,
+            spec: spec.clone(),
+            notify_channel: *notify_channel,
+        }),
     }
 }
 
@@ -633,6 +646,16 @@ pub async fn dispatch_action(
                             ));
                         }
                     };
+                    let platform_job_id = trigger_ctx
+                        .webhook_fields
+                        .get("job_id")
+                        .map(String::as_str)
+                        .filter(|value| !value.trim().is_empty());
+                    let platform_tenant = trigger_ctx
+                        .webhook_fields
+                        .get("tenant")
+                        .map(String::as_str)
+                        .filter(|value| !value.trim().is_empty());
                     let event_id = engine
                         .action_sink()?
                         .send_message(
@@ -642,6 +665,8 @@ pub async fn dispatch_action(
                             authored_text,
                             &owner_pubkey_hex,
                             reply_to,
+                            platform_job_id,
+                            platform_tenant,
                         )
                         .await
                         .map_err(WorkflowError::from)?;
@@ -741,6 +766,87 @@ pub async fn dispatch_action(
                     Ok(StepResult::Suspended {
                         approval_token: token,
                     })
+                }
+
+                InvokeChainlet {
+                    specialty,
+                    tenant,
+                    subject,
+                    spec,
+                    notify_channel,
+                } => {
+                    let tenant = tenant
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| trigger_ctx.webhook_fields.get("tenant").map(String::as_str))
+                        .unwrap_or("default");
+                    let subject = subject
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| trigger_ctx.webhook_fields.get("job_id").map(String::as_str))
+                        .unwrap_or("workflow");
+                    let timeout = step.timeout_secs.unwrap_or(120);
+                    let sink = engine.action_sink()?;
+                    let result = sink
+                        .invoke_chainlet(
+                            specialty,
+                            tenant,
+                            subject,
+                            spec.as_ref(),
+                            timeout,
+                        )
+                        .await?;
+                    if *notify_channel {
+                        let summary = result
+                            .get("status")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown");
+                        let job_id = result
+                            .get("job_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let text = format!(
+                            "Chainlet `{specialty}` finished with status `{summary}` (job_id={job_id})."
+                        );
+                        let wf_run = engine
+                            .db
+                            .get_workflow_run(community_id, run_id)
+                            .await
+                            .map_err(|e| {
+                                WorkflowError::WebhookError(format!(
+                                    "InvokeChainlet: failed to load workflow run {run_id}: {e}"
+                                ))
+                            })?;
+                        let workflow = engine
+                            .db
+                            .get_workflow(community_id, wf_run.workflow_id)
+                            .await
+                            .map_err(|e| {
+                                WorkflowError::WebhookError(format!(
+                                    "InvokeChainlet: failed to load workflow {}: {e}",
+                                    wf_run.workflow_id
+                                ))
+                            })?;
+                        let channel_id = resolve_send_message_channel(
+                            None,
+                            &trigger_ctx.channel_id,
+                            workflow.channel_id,
+                        )?;
+                        let owner_pubkey_hex = hex::encode(&workflow.owner_pubkey);
+                        let _ = sink
+                            .send_message(
+                                community_id,
+                                &channel_id,
+                                &text,
+                                &text,
+                                &owner_pubkey_hex,
+                                None,
+                                trigger_ctx.webhook_fields.get("job_id").map(String::as_str),
+                                trigger_ctx.webhook_fields.get("tenant").map(String::as_str),
+                            )
+                            .await?;
+                    }
+                    Ok(StepResult::Completed(result))
                 }
 
                 Delay { duration } => {

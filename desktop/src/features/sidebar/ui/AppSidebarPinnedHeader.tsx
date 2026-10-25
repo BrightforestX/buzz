@@ -1,4 +1,4 @@
-import { Activity, Bot, Folders, Inbox, Zap } from "lucide-react";
+import { Activity, Bot, Folders, GitBranch, Inbox, Zap } from "lucide-react";
 
 import { TopbarSearch } from "@/features/search/ui/TopbarSearch";
 import { SidebarProjectsSection } from "@/features/sidebar/ui/SidebarProjectsSection";
@@ -21,6 +21,7 @@ type SidebarSelectedView =
   | "agents"
   | "workflows"
   | "pulse"
+  | "scenarios"
   | "projects";
 
 type AppSidebarPinnedHeaderProps = {
@@ -45,6 +46,7 @@ type AppSidebarPrimaryMenuProps = {
   onSelectHome: () => void;
   onSelectProjects: () => void;
   onSelectPulse: () => void;
+  onSelectScenarios: () => void;
   onSelectWorkflows: () => void;
   projectsOverviewActive: boolean;
   selectedView: SidebarSelectedView;
@@ -95,6 +97,7 @@ export function AppSidebarPrimaryMenu({
   onSelectHome,
   onSelectProjects,
   onSelectPulse,
+  onSelectScenarios,
   onSelectWorkflows,
   projectsOverviewActive,
   selectedView,
@@ -168,6 +171,20 @@ export function AppSidebarPrimaryMenu({
               <SidebarMenuLabel>Agents</SidebarMenuLabel>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <FeatureGate feature="scenarios">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                data-testid="open-scenarios-view"
+                isActive={selectedView === "scenarios"}
+                onClick={onSelectScenarios}
+                tooltip="Scenarios"
+                type="button"
+              >
+                <GitBranch className="h-4 w-4" />
+                <SidebarMenuLabel>Scenarios</SidebarMenuLabel>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </FeatureGate>
           <ProtectedBestieSidebarEntry />
           <FeatureGate feature="workflows">
             <SidebarMenuItem>

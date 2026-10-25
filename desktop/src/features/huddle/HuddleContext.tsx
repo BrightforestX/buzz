@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import * as React from "react";
 
+import { waitForTauriIpcReady } from "@/shared/lib/tauriReady";
+
 import { setupAudioWorklet, type AudioWorkletHandle } from "./lib/audioWorklet";
 import { type AudioInputDevice, useAudioDevices } from "./lib/useAudioDevices";
 import { usePipelineHotstart } from "./lib/usePipelineHotstart";
@@ -450,18 +452,21 @@ export function HuddleProvider({
 
     let cancelled = false;
     let unlisten: (() => void) | null = null;
-    void invoke<HuddleBackendState>("get_huddle_state")
-      .then((state) => {
-        if (!cancelled && state) applyBackendState(state);
-      })
-      .catch(() => {
-        /* best-effort; lifecycle events remain authoritative */
+    void waitForTauriIpcReady().then((ready) => {
+      if (!ready || cancelled) return;
+      void invoke<HuddleBackendState>("get_huddle_state")
+        .then((state) => {
+          if (!cancelled && state) applyBackendState(state);
+        })
+        .catch(() => {
+          /* best-effort; lifecycle events remain authoritative */
+        });
+      void listen<HuddleBackendState>("huddle-state-changed", (event) => {
+        if (!cancelled) applyBackendState(event.payload);
+      }).then((cleanup) => {
+        if (cancelled) cleanup();
+        else unlisten = cleanup;
       });
-    void listen<HuddleBackendState>("huddle-state-changed", (event) => {
-      if (!cancelled) applyBackendState(event.payload);
-    }).then((cleanup) => {
-      if (cancelled) cleanup();
-      else unlisten = cleanup;
     });
     return () => {
       cancelled = true;

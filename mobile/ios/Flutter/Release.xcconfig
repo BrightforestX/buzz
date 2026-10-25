@@ -16,4 +16,6 @@ BUZZ_APP_GROUP_IDENTIFIER = group.$(BUNDLE_IDENTIFIER)
 BUZZ_KEYCHAIN_ACCESS_GROUP = $(BUNDLE_IDENTIFIER)
 BUZZ_IOS_PUSH_ENVIRONMENT = production
 BUZZ_APP_ATTEST_ENVIRONMENT = production
+BUZZ_RUNNER_ENTITLEMENTS = Runner/Runner.entitlements
+BUZZ_NOTIFICATION_SERVICE_ENTITLEMENTS = NotificationService/NotificationService.entitlements
 #include? "AppOverrides.xcconfig"

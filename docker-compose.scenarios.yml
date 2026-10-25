@@ -1,0 +1,3 @@
+# Alias — use docker-compose.buzz-stack.yml (canonical).
+include:
+  - path: docker-compose.buzz-stack.yml

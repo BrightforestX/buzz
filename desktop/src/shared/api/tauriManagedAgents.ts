@@ -24,6 +24,10 @@ export async function startManagedAgent(
      * long the spawn takes. Local spawns receive it as process env; provider
      * deploys carry it in the payload's launch.policy_env. */
     replayFloorUnix?: number;
+    /** Stable platform job id from a workflow webhook (`trigger.body.job_id`). */
+    platformJobId?: string;
+    /** Tenant segment for upstream Temporal id correlation. */
+    platformTenant?: string;
   },
 ): Promise<ManagedAgent> {
   const response = await invokeTauri<RawManagedAgent>("start_managed_agent", {
@@ -31,6 +35,8 @@ export async function startManagedAgent(
     expectedRelayUrl: options?.expectedRelayUrl ?? null,
     expectedSignerPubkey: options?.expectedSignerPubkey ?? null,
     replayFloorUnix: options?.replayFloorUnix ?? null,
+    platformJobId: options?.platformJobId ?? null,
+    platformTenant: options?.platformTenant ?? null,
   });
   return fromRawManagedAgent(response);
 }

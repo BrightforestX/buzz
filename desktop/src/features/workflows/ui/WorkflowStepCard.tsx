@@ -101,6 +101,13 @@ function BackendSupportHint({ action }: { action: StepFormState["action"] }) {
           records are not persisted yet.
         </p>
       );
+    case "invoke_chainlet":
+      return (
+        <p className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs text-sky-800">
+          Relay-only: runs baseten-chain-mcp on the buzz-relay host (Path B).
+          Desktop does not execute this step locally.
+        </p>
+      );
     default:
       return null;
   }
@@ -235,6 +242,68 @@ function StepConfigFields({
               placeholder="DM content"
               value={step.text ?? ""}
             />
+          </div>
+        </div>
+      );
+    case "invoke_chainlet":
+      return (
+        <div className="space-y-2">
+          <BackendSupportHint action={step.action} />
+          <div className="space-y-1.5">
+            <FieldLabel htmlFor={`${prefix}-specialty`}>Specialty</FieldLabel>
+            <Input
+              autoCapitalize="off"
+              disabled={disabled}
+              id={`${prefix}-specialty`}
+              onChange={(event) =>
+                onUpdate({ ...step, chainletSpecialty: event.target.value })
+              }
+              placeholder="e.g. ontology-action-draft or {{trigger.body.specialty}}"
+              value={step.chainletSpecialty ?? ""}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <FieldLabel htmlFor={`${prefix}-tenant`}>
+              Tenant (optional)
+            </FieldLabel>
+            <Input
+              autoCapitalize="off"
+              disabled={disabled}
+              id={`${prefix}-tenant`}
+              onChange={(event) =>
+                onUpdate({ ...step, chainletTenant: event.target.value })
+              }
+              placeholder="e.g. {{trigger.body.tenant}}"
+              value={step.chainletTenant ?? ""}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <FieldLabel htmlFor={`${prefix}-subject`}>
+              Subject (optional)
+            </FieldLabel>
+            <Input
+              autoCapitalize="off"
+              disabled={disabled}
+              id={`${prefix}-subject`}
+              onChange={(event) =>
+                onUpdate({ ...step, chainletSubject: event.target.value })
+              }
+              placeholder="e.g. {{trigger.body.job_id}}"
+              value={step.chainletSubject ?? ""}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={step.chainletNotifyChannel === true}
+              disabled={disabled}
+              id={`${prefix}-notify-channel`}
+              onCheckedChange={(checked) =>
+                onUpdate({ ...step, chainletNotifyChannel: checked === true })
+              }
+            />
+            <label className="text-xs" htmlFor={`${prefix}-notify-channel`}>
+              Post completion summary to workflow channel
+            </label>
           </div>
         </div>
       );

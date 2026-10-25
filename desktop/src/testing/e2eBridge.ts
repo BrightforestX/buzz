@@ -32,6 +32,11 @@ import {
 import { switchManagedAgentModel } from "@/shared/api/agentControl";
 import { mockSearchHitMatches } from "./e2eBridgeSearch.ts";
 export { mockSearchHitMatches };
+import {
+  expandWorkflowTriggerBodyTemplate,
+  extractPlatformDispatchContext,
+} from "@/features/workflows/lib/platformDispatchContext";
+import { planPlatformDispatchWake } from "@/features/workflows/lib/platformDispatchWake";
 import type { ConnectionState } from "@/shared/api/relayClientShared";
 import type {
   ChannelTemplate,
@@ -304,6 +309,14 @@ type E2eConfig = {
     managedAgentPrereqs?: {
       acp?: MockCommandAvailability;
       mcp?: MockCommandAvailability;
+    };
+    /** Mock `get_agent_mcp_settings` / `set_agent_mcp_settings` behavior. */
+    agentMcpSettings?: {
+      chainMcpResolvable?: boolean;
+      mirofishMcpResolvable?: boolean;
+      resolvedChainCommand?: string | null;
+      resolvedMirofishCommand?: string | null;
+      getError?: string;
     };
     managedAgents?: MockManagedAgentSeed[];
     /** Result returned by the mocked `add_agent_to_huddle` command. */
@@ -1629,6 +1642,52 @@ const CHANNEL_WINDOW_AUX_DELETION_KINDS = new Set([
 // asserts against this exact port.
 const MOCK_MEDIA_PROXY_PORT = 54321;
 let mockMediaProxyPort = MOCK_MEDIA_PROXY_PORT;
+
+type MockAgentMcpSettingsView = {
+  chainMcpEnabled: boolean;
+  mirofishMcpEnabled: boolean;
+  mirofishBaseUrl: string | null;
+  chainMcpResolvable: boolean;
+  mirofishMcpResolvable: boolean;
+  resolvedChainCommand: string | null;
+  resolvedMirofishCommand: string | null;
+};
+
+let mockAgentMcpSettingsState: MockAgentMcpSettingsView = {
+  chainMcpEnabled: true,
+  mirofishMcpEnabled: true,
+  mirofishBaseUrl: null,
+  chainMcpResolvable: true,
+  mirofishMcpResolvable: true,
+  resolvedChainCommand: "/mock/baseten-chain-mcp",
+  resolvedMirofishCommand: "/mock/mirofish-mcp-server/scripts/run-stdio.sh",
+};
+
+function resetMockAgentMcpSettings(config?: E2eConfig) {
+  const seed = config?.mock?.agentMcpSettings;
+  mockAgentMcpSettingsState = {
+    chainMcpEnabled: true,
+    mirofishMcpEnabled: true,
+    mirofishBaseUrl: null,
+    chainMcpResolvable: seed?.chainMcpResolvable ?? true,
+    mirofishMcpResolvable: seed?.mirofishMcpResolvable ?? true,
+    resolvedChainCommand:
+      seed?.resolvedChainCommand ?? "/mock/baseten-chain-mcp",
+    resolvedMirofishCommand:
+      seed?.resolvedMirofishCommand ??
+      "/mock/mirofish-mcp-server/scripts/run-stdio.sh",
+  };
+}
+
+function mockAgentMcpSettingsView(
+  config: E2eConfig | undefined,
+): MockAgentMcpSettingsView {
+  const seed = config?.mock?.agentMcpSettings;
+  if (seed?.getError) {
+    throw new Error(seed.getError);
+  }
+  return { ...mockAgentMcpSettingsState };
+}
 
 // A relay-hosted custom emoji used by the reaction guard. Its URL matches
 // `rewriteRelayUrl()`'s `/media/{64-hex}.{ext}` pattern on the relay origin, so
@@ -4066,11 +4125,15 @@ function handleDeleteWorkflow(args: { workflowId: string }) {
   );
 }
 
-function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
+function buildMockWorkflowRun(
+  workflow: MockWorkflow,
+  webhookBody?: Record<string, unknown>,
+): RawWorkflowRun {
   const createdAt = Math.floor(Date.now() / 1000);
   const rawSteps = Array.isArray(workflow.definition.steps)
     ? workflow.definition.steps
     : [];
+  const body = webhookBody ?? {};
   const executionTrace = rawSteps.map((candidate, index) => {
     const step =
       candidate && typeof candidate === "object"
@@ -4087,7 +4150,10 @@ function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
       output.name = step.name;
     }
     if (typeof step.text === "string" && step.text.trim().length > 0) {
-      output.preview = step.text;
+      output.preview =
+        Object.keys(body).length > 0
+          ? expandWorkflowTriggerBodyTemplate(step.text, body)
+          : step.text;
     }
 
     return {
@@ -4127,18 +4193,123 @@ function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
   };
 }
 
-function handleTriggerWorkflow(args: { workflowId: string }) {
+async function recordMockStartManagedAgent(
+  payload: Record<string, unknown>,
+  config?: E2eConfig,
+): Promise<RawManagedAgent> {
+  window.__BUZZ_E2E_COMMANDS__?.push("start_managed_agent");
+  window.__BUZZ_E2E_COMMAND_PAYLOADS__?.push({
+    command: "start_managed_agent",
+    payload,
+  });
+  return handleStartManagedAgent(
+    payload as Parameters<typeof handleStartManagedAgent>[0],
+    config,
+  ).finally(() => {
+    window.__BUZZ_E2E_COMMANDS__?.push("start_managed_agent:settled");
+  });
+}
+
+async function dispatchPlatformWakeForMockWorkflow(args: {
+  workflow: MockWorkflow;
+  webhookBody?: Record<string, unknown>;
+  fallbackTenant?: string | null;
+  config?: E2eConfig;
+}): Promise<void> {
+  const steps = Array.isArray(args.workflow.definition.steps)
+    ? (args.workflow.definition.steps as Array<{
+        action?: string;
+        text?: string;
+      }>)
+    : [];
+  const wakePlan = planPlatformDispatchWake({
+    steps,
+    webhookBody: args.webhookBody,
+    fallbackTenant: args.fallbackTenant,
+    agents: mockManagedAgents.map((agent) => ({
+      pubkey: agent.pubkey,
+      displayName: mockDisplayNames.get(agent.pubkey) ?? agent.name,
+      status: agent.status,
+    })),
+  });
+  if (!wakePlan) return;
+
+  await recordMockStartManagedAgent(
+    {
+      pubkey: wakePlan.agentPubkey,
+      expectedRelayUrl: null,
+      expectedSignerPubkey: null,
+      replayFloorUnix: Math.floor(Date.now() / 1000),
+      platformJobId: wakePlan.context.platformJobId,
+      platformTenant: wakePlan.context.platformTenant,
+    },
+    args.config,
+  );
+}
+
+async function handleTriggerWorkflow(
+  args: {
+    workflowId: string;
+    webhookBody?: Record<string, unknown>;
+    communityId?: string;
+  },
+  config?: E2eConfig,
+) {
   const workflow = mockWorkflows.find((w) => w.id === args.workflowId);
   if (!workflow) throw new Error(`Workflow ${args.workflowId} not found`);
   const configuredError = window.__BUZZ_E2E__?.mock?.workflowTriggerError;
   if (configuredError) throw new Error(configuredError);
-  const run = buildMockWorkflowRun(workflow);
+
+  const trigger = workflow.definition.trigger as
+    | Record<string, unknown>
+    | undefined;
+  const webhookBody =
+    trigger?.on === "webhook" ? (args.webhookBody ?? {}) : undefined;
+  const fallbackTenant =
+    args.communityId ??
+    (typeof webhookBody?.tenant === "string"
+      ? webhookBody.tenant
+      : undefined) ??
+    "test-community";
+
+  const run = buildMockWorkflowRun(workflow, webhookBody);
   mockWorkflowRuns = [run, ...mockWorkflowRuns];
+
+  if (
+    webhookBody &&
+    extractPlatformDispatchContext(webhookBody, fallbackTenant)
+  ) {
+    await dispatchPlatformWakeForMockWorkflow({
+      workflow,
+      webhookBody,
+      fallbackTenant,
+      config,
+    });
+  }
+
   return {
     run_id: run.id,
     workflow_id: workflow.id,
     status: run.status,
   };
+}
+
+async function handleMockWorkflowWebhookPost(
+  args: {
+    workflowId: string;
+    body?: Record<string, unknown>;
+    communityId?: string;
+  },
+  config?: E2eConfig,
+) {
+  return handleTriggerWorkflow(
+    {
+      workflowId: args.workflowId,
+      webhookBody: args.body ?? {},
+      communityId: args.communityId,
+    },
+    config,
+  );
 }
 
 function handleGetWorkflowRuns(args: {
@@ -9702,6 +9873,9 @@ async function handleStartManagedAgent(
     pubkey: string;
     expectedRelayUrl?: string | null;
     expectedSignerPubkey?: string | null;
+    replayFloorUnix?: number | null;
+    platformJobId?: string | null;
+    platformTenant?: string | null;
   },
   config?: E2eConfig,
 ): Promise<RawManagedAgent> {
@@ -11369,6 +11543,7 @@ export function maybeInstallE2eTauriMocks() {
   resetMockRelayMembers(config);
   resetMockRelayAgents(config);
   resetMockManagedAgents(config);
+  resetMockAgentMcpSettings(config);
   resetMockPersonas(config);
   resetMockTeams(config);
   seedMockSearchProfiles(config);
@@ -13989,6 +14164,28 @@ export function maybeInstallE2eTauriMocks() {
         return undefined;
       case "set_thread_scoped_acp_sessions":
         return undefined;
+      case "get_agent_mcp_settings":
+        return mockAgentMcpSettingsView(activeConfig);
+      case "set_agent_mcp_settings": {
+        const input = payload as {
+          chainMcpEnabled?: boolean;
+          mirofishMcpEnabled?: boolean;
+          mirofishBaseUrl?: string | null;
+        };
+        mockAgentMcpSettingsState = {
+          ...mockAgentMcpSettingsState,
+          chainMcpEnabled:
+            input.chainMcpEnabled ?? mockAgentMcpSettingsState.chainMcpEnabled,
+          mirofishMcpEnabled:
+            input.mirofishMcpEnabled ??
+            mockAgentMcpSettingsState.mirofishMcpEnabled,
+          mirofishBaseUrl:
+            input.mirofishBaseUrl !== undefined
+              ? input.mirofishBaseUrl
+              : mockAgentMcpSettingsState.mirofishBaseUrl,
+        };
+        return mockAgentMcpSettingsView(activeConfig);
+      }
       case "set_managed_agent_auto_restart":
         return handleSetManagedAgentAutoRestart(
           payload as Parameters<typeof handleSetManagedAgentAutoRestart>[0],
@@ -14680,6 +14877,12 @@ export function maybeInstallE2eTauriMocks() {
       case "trigger_workflow":
         return handleTriggerWorkflow(
           payload as Parameters<typeof handleTriggerWorkflow>[0],
+          activeConfig,
+        );
+      case "mock_workflow_webhook_post":
+        return handleMockWorkflowWebhookPost(
+          payload as Parameters<typeof handleMockWorkflowWebhookPost>[0],
+          activeConfig,
         );
       case "get_workflow_runs":
         return handleGetWorkflowRuns(

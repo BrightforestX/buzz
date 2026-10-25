@@ -10,6 +10,8 @@ mod rejection;
 pub mod api;
 /// WebSocket audio relay for huddle voice channels.
 pub mod audio;
+/// Headless chainlet invoke for workflow `invoke_chainlet` (Path B).
+pub mod chainlet_client;
 /// Relay configuration from environment variables.
 pub mod config;
 /// Runtime conformance harness — abstract trace emission at the

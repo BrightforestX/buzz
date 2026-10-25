@@ -75,6 +75,7 @@ def test_buzz_task_metadata_defines_the_expected_layers():
         "regression": {
             "reply-to-thread",
             "user-mention",
+            "voice-wake-mention",
             "read-named-path-outside-workspace",
             "multiline-message",
             "memory-retrieval",

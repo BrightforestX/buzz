@@ -168,6 +168,7 @@ pub(super) async fn start_local_agent_with_preflight(
     expected_relay_url: Option<&str>,
     expected_signer_pubkey: Option<&str>,
     replay_floor_unix: Option<u64>,
+    platform_job: Option<crate::managed_agents::PlatformJobContext>,
 ) -> Result<ManagedAgentSummary, String> {
     let record_snapshot = {
         let _store_guard = state
@@ -262,6 +263,7 @@ pub(super) async fn start_local_agent_with_preflight(
         Some(workspace_owner.as_str()),
         &workspace_relay_url,
         replay_floor_unix,
+        platform_job,
     )?;
     save_managed_agents(app, &records)?;
     if let Some(saved_record) = records.iter().find(|r| r.pubkey == pubkey) {
@@ -713,7 +715,8 @@ pub async fn create_managed_agent(
     // ── Phase 3b: local spawn (async preflight outside store lock) ───────────
     let mut spawn_error = None;
     let agent = if input.spawn_after_create && input.backend == BackendKind::Local {
-        match start_local_agent_with_preflight(&app, &state, &pubkey, true, None, None, None).await
+        match start_local_agent_with_preflight(&app, &state, &pubkey, true, None, None, None, None)
+            .await
         {
             Ok(agent) => agent,
             Err(error) => {
@@ -775,7 +778,7 @@ pub async fn create_managed_agent(
                 build_deploy_payload(&app, &state, rec)?
             };
             match deploy_to_provider(
-                &app, &state, &pubkey, id, config, agent_json, None, None, None, None,
+                &app, &state, &pubkey, id, config, agent_json, None, None, None, None, None,
             )
             .await
             {
@@ -824,9 +827,13 @@ pub async fn start_managed_agent(
     expected_relay_url: Option<String>,
     expected_signer_pubkey: Option<String>,
     replay_floor_unix: Option<u64>,
+    platform_job_id: Option<String>,
+    platform_tenant: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ManagedAgentSummary, String> {
+    let platform_job =
+        crate::managed_agents::PlatformJobContext::from_parts(platform_job_id, platform_tenant);
     // Snapshot the workspace owner pubkey for the legacy auth_tag fallback.
     // Read outside the records lock to keep lock ordering simple.
     let owner_hex = workspace_owner_hex(&state)?;
@@ -924,6 +931,7 @@ pub async fn start_managed_agent(
                 expected_relay_url.as_deref(),
                 expected_signer_pubkey.as_deref(),
                 replay_floor_unix,
+                platform_job.clone(),
             )
             .await
         }
@@ -950,6 +958,7 @@ pub async fn start_managed_agent(
                 expected_relay_url.as_deref(),
                 expected_signer_pubkey.as_deref(),
                 replay_floor_unix,
+                platform_job,
             )
             .await?;
 

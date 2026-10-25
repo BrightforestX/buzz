@@ -23,8 +23,9 @@ pub(crate) use super::access_policy::{build_respond_to_env_with_policy, RespondT
 
 mod metadata;
 pub(crate) use metadata::{
-    apply_agent_display_env, apply_replay_floor_env, child_rust_log_filter, resolve_session_title,
-    runtime_metadata_env_vars, DISPLAY_NAME_ENV_VAR, REPLAY_FLOOR_ENV_VAR, SESSION_TITLE_ENV_VAR,
+    apply_agent_display_env, apply_platform_job_env, apply_replay_floor_env, child_rust_log_filter,
+    resolve_session_title, runtime_metadata_env_vars, PlatformJobContext, DISPLAY_NAME_ENV_VAR,
+    PLATFORM_JOB_ID_ENV_VAR, PLATFORM_TENANT_ENV_VAR, REPLAY_FLOOR_ENV_VAR, SESSION_TITLE_ENV_VAR,
 };
 
 mod setup_payload;
@@ -444,6 +445,7 @@ pub(crate) fn spawn_with_effort_proof(
 /// publishes the triggering message before this spawn and passes its send
 /// timestamp here so the harness's first REQ replays past that message no
 /// matter how long the spawn takes. buzz-acp clamps stale floors to ~15 min.
+/// `platform_job`: optional webhook/platform dispatch context (per-invocation only).
 pub fn spawn_agent_child(
     app: &AppHandle,
     record: &ManagedAgentRecord,
@@ -451,6 +453,7 @@ pub fn spawn_agent_child(
     lazy: bool,
     owner_hex: Option<&str>,
     replay_floor_unix: Option<u64>,
+    platform_job: Option<PlatformJobContext>,
 ) -> Result<crate::managed_agents::ManagedAgentProcess, String> {
     if let Some(error) = spawn_key_refusal(record) {
         return Err(error);
@@ -581,6 +584,9 @@ pub fn spawn_agent_child(
     // leak into an unrelated spawn; the caller's floor is asserted AFTER that
     // loop by `apply_replay_floor_env` so saved user env cannot shadow it.
     command.env_remove(REPLAY_FLOOR_ENV_VAR);
+    command
+        .env_remove(PLATFORM_JOB_ID_ENV_VAR)
+        .env_remove(PLATFORM_TENANT_ENV_VAR);
     command.env("BUZZ_ACP_AGENT_COMMAND", &resolved_agent_command);
     command.env("BUZZ_ACP_AGENT_ARGS", agent_args.join(","));
     match &resolved_mcp_command {
@@ -765,6 +771,14 @@ pub fn spawn_agent_child(
     // BUZZ_ACP_REPLAY_FLOOR — the shadow `apply_replay_floor` strips from the
     // provider payload's `launch.env` tier for the same reason.
     apply_replay_floor_env(&mut command, replay_floor_unix);
+    apply_platform_job_env(&mut command, platform_job.as_ref());
+    super::chainlet_registry::apply_chain_specialty_env(&mut command, record.persona_id.as_deref());
+    super::mcp_settings::apply_app_agent_mcp_env(
+        app,
+        &mut command,
+        record.persona_id.as_deref(),
+        resolve_command,
+    );
 
     // A1: for local claude agents, ANTHROPIC_MODEL is the single startup model authority.
     // BUZZ_ACP_MODEL is removed (live ACP switches only; two authorities in the same env
@@ -785,6 +799,13 @@ pub fn spawn_agent_child(
         let mesh_env = super::relay_mesh_process_env(&descriptor.env, mesh_model_id);
         command.env_remove("OPENAI_API_KEY");
         for (key, value) in mesh_env {
+            command.env(key, value);
+        }
+    }
+
+    if effective_provider.as_deref().map(str::trim) == Some(super::BASETEN_PROVIDER_ID) {
+        let baseten_env = super::baseten_process_env(&descriptor.env, effective_model.as_deref());
+        for (key, value) in baseten_env {
             command.env(key, value);
         }
     }
@@ -881,6 +902,7 @@ pub fn start_managed_agent_process(
     owner_hex: Option<&str>,
     workspace_relay: &crate::relay::ScopedWorkspaceRelay,
     replay_floor_unix: Option<u64>,
+    platform_job: Option<PlatformJobContext>,
 ) -> Result<(), String> {
     let key = bound_runtime_key(record, workspace_relay)?;
     if let Some(runtime) = runtimes.get_mut(&key) {
@@ -907,6 +929,7 @@ pub fn start_managed_agent_process(
         false,
         owner_hex,
         replay_floor_unix,
+        platform_job,
     )?;
     let now = now_iso();
     let receipt = super::ManagedAgentRuntimeReceipt {

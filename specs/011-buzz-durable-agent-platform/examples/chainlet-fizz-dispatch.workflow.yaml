@@ -1,0 +1,26 @@
+# Path A: Dispatch Fizz chainlet agent via webhook + @mention
+# Spec: specs/011-buzz-durable-agent-platform/ (chainlet dispatch)
+# Agent must be deployed with chain_specialty ontology-action-draft (Fizz persona).
+
+name: chainlet-fizz-dispatch
+description: >
+  Wakes @Fizz to run the ontology-action-draft chainlet for a platform job.
+  Agent session uses baseten-chain-mcp (list_chainlets → submit_chain_job).
+
+enabled: true
+
+trigger:
+  on: webhook
+
+steps:
+  - id: wake_fizz
+    name: Wake Fizz chainlet agent
+    action: send_message
+    text: "@Fizz Run chainlet specialty ontology-action-draft for job {{trigger.body.job_id}} (tenant {{trigger.body.tenant}})."
+
+  - id: ack_dispatch
+    name: Acknowledge dispatch
+    if: "trigger_body_job_id != ''"
+    action: send_message
+    text: "Dispatched ontology-action-draft for {{trigger.body.job_id}}."
+    reply_in_thread: true

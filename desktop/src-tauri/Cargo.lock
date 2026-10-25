@@ -1094,6 +1094,7 @@ dependencies = [
  "buzz-agent",
  "buzz-core",
  "buzz-media",
+ "buzz-nip46",
  "buzz-persona",
  "buzz-sdk",
  "buzz-terminal",
@@ -1204,6 +1205,17 @@ dependencies = [
  "tracing",
  "ulid",
  "uuid",
+]
+
+[[package]]
+name = "buzz-nip46"
+version = "0.1.0"
+dependencies = [
+ "nostr 0.44.7",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

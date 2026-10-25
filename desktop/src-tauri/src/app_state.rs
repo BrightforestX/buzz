@@ -38,6 +38,8 @@ pub struct AppState {
     pub managed_agent_restore_pending: AtomicBool,
     /// Experiment state applied to managed-agent starts and profile reconciliation.
     pub managed_agent_experiments: crate::managed_agents::ManagedAgentExperimentState,
+    /// Persisted toggles for optional agent MCP servers (chain, MiroFish).
+    pub agent_mcp: crate::managed_agents::AgentMcpRuntimeState,
     /// Shared shutdown signal checked by launch-time agent restoration.
     pub shutdown_started: AtomicBool,
     /// Serializes every managed-runtime transition that changes the protected
@@ -217,6 +219,7 @@ pub fn build_app_state() -> AppState {
         workspace_apply_generation: AtomicU64::new(0),
         managed_agent_restore_pending: AtomicBool::new(false),
         managed_agent_experiments: crate::managed_agents::ManagedAgentExperimentState::default(),
+        agent_mcp: crate::managed_agents::AgentMcpRuntimeState::default(),
         shutdown_started: AtomicBool::new(false),
         managed_agent_runtime_transition: Mutex::new(()),
         identity_mutation: Mutex::new(()),

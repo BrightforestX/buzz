@@ -80,5 +80,22 @@ loop:
   stopped_at: "2026-09-12T04:18:00Z"
   stopped_reason: user requested stop; no recurring heartbeat armed
 
+pull_requests:
+  - repo: BrightforestX/buzz
+    url: https://github.com/BrightforestX/buzz/pull/1
+    branch: feat/fly-context-portfolio
+  - repo: BrightforestX/glasses
+    url: https://github.com/BrightforestX/glasses/pull/1
+    branch: feat/fly-context-portfolio
+  - repo: BrightforestX/ontology-stack
+    url: https://github.com/BrightforestX/ontology-stack/pull/1
+    branch: feat/fly-context-portfolio
+  - repo: BrightforestX/ontology-loop
+    url: https://github.com/BrightforestX/ontology-loop/pull/3
+    branch: feat/fly-context-portfolio
+  - repo: BrightforestX/linkml-surreal
+    url: https://github.com/BrightforestX/linkml-surreal/pull/2
+    branch: feat/fly-context-portfolio
+
 pending_edits: []
 open_questions: []

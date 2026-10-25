@@ -104,6 +104,18 @@ export function useAppNavigation() {
     [commitNavigation],
   );
 
+  const goScenarios = React.useCallback(
+    (input?: { graphId?: string }, behavior?: NavigationBehavior) =>
+      commitNavigation(
+        {
+          to: "/scenarios",
+          search: input?.graphId ? { graphId: input.graphId } : {},
+        },
+        behavior,
+      ),
+    [commitNavigation],
+  );
+
   const goProfile = React.useCallback(
     (pubkey: string, behavior?: NavigationBehavior) =>
       commitNavigation(
@@ -470,6 +482,7 @@ export function useAppNavigation() {
     goProject,
     goProjects,
     goPulse,
+    goScenarios,
     goProfile,
     goSettings,
     goWorkflow,

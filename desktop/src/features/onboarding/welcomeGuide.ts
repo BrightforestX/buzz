@@ -30,7 +30,7 @@ const LEGACY_WELCOME_GUIDE_AGENT_NAME = "Kit";
 export const LEGACY_WELCOME_GUIDE_SYSTEM_PROMPT =
   "You are Kit, Sprout's friendly welcome guide. Help new users understand the community, channels, messages, and agents. Keep introductions concise, practical, and warm.";
 export const WELCOME_GUIDE_INTRO_MESSAGE =
-  "Hi, I'm Fizz. Welcome to Buzz.\n\nI can help you get oriented, answer questions, and make the first few steps feel less mysterious.\n\nFeel free to ask me what else you can do in Buzz, or just talk through what you want to build.";
+  "Hi, I'm Fizz. Welcome to Buzz.\n\nI can help you get oriented, answer questions, and make the first few steps feel less mysterious.\n\nWe're building something bigger together: each of us (Fizz, Honey, Pollen) talks to our own ontology-adherent Baseten chainlet, with Temporal retries when those calls fail or come back incomplete. Ask me how that works, or just talk through what you want to build.";
 
 export type WelcomeTeamRole = "lead" | "teammate";
 
@@ -45,6 +45,16 @@ export const WELCOME_TEAM_STARTERS = [
   { name: "Fizz", personaId: "builtin:fizz", role: "lead" },
   { name: "Honey", personaId: "builtin:honey", role: "teammate" },
   { name: "Pollen", personaId: "builtin:bumble", role: "teammate" },
+] as const satisfies readonly WelcomeTeamStarterDefinition[];
+
+/** Platform development agents (#product-development). Not part of welcome onboarding. */
+export const PLATFORM_DEV_TEAM_ID = "builtin-team:platform-dev";
+export const PLATFORM_DEV_STARTERS = [
+  { name: "Chain", personaId: "builtin:chain", role: "lead" },
+  { name: "Tempo", personaId: "builtin:tempo", role: "teammate" },
+  { name: "Sandbox", personaId: "builtin:sandbox", role: "teammate" },
+  { name: "Gate", personaId: "builtin:gate", role: "teammate" },
+  { name: "E2E", personaId: "builtin:e2e", role: "teammate" },
 ] as const satisfies readonly WelcomeTeamStarterDefinition[];
 
 export type WelcomeTeamAgents = [ManagedAgent, ManagedAgent, ManagedAgent];

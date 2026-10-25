@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import {
   channelMessagesKey,
   channelWindowKey,
-  threadRepliesKey,
 } from "@/features/messages/lib/messageQueryKeys";
 import {
   buildReplyTags,
@@ -61,6 +60,7 @@ import type { Channel, Identity, RelayEvent } from "@/shared/api/types";
 // from the on-render overlay.
 import { applyEditTagOverlay } from "@/features/messages/lib/applyEditTagOverlay.mjs";
 import {
+  bumpLiveThreadSummaryFromReply,
   emptyChannelWindowStore,
   mapChannelWindowEvents,
   mergeLiveChannelWindowEvent,
@@ -68,6 +68,10 @@ import {
   replaceNewestChannelWindow,
   type ChannelWindowStore,
 } from "@/features/messages/lib/channelWindowStore";
+import {
+  mergeThreadReplyIntoCache,
+  removeThreadReplyFromCache,
+} from "@/features/messages/lib/threadReplyCache";
 import {
   parseChannelWindowResponse,
   parseLiveThreadSummary,
@@ -86,7 +90,24 @@ type MessageQueryContext = {
   previousWindow: ChannelWindowStore | undefined;
   channelId: string;
   queryKey: ReturnType<typeof channelMessagesKey>;
+  threadReplyRootId: string | null;
 };
+
+function applyThreadReplySummaryBump(
+  queryClient: QueryClient,
+  channelId: string,
+  rootId: string,
+  event: RelayEvent,
+) {
+  const windowKey = channelWindowKey(channelId);
+  const current =
+    queryClient.getQueryData<ChannelWindowStore>(windowKey) ??
+    emptyChannelWindowStore();
+  const next = bumpLiveThreadSummaryFromReply(current, rootId, event);
+  if (next !== current) {
+    queryClient.setQueryData(windowKey, next);
+  }
+}
 
 const CHANNEL_TIMELINE_KINDS = new Set<number>(CHANNEL_TIMELINE_CONTENT_KINDS);
 const CHANNEL_AUX_KINDS = new Set<number>(CHANNEL_AUX_EVENT_KINDS);
@@ -344,11 +365,13 @@ export function useChannelSubscription(channel: Channel | null) {
       ? getThreadReference(event.tags)
       : null;
     if (threadReference?.parentId != null) {
-      const rootId = threadReference?.rootId;
-      if (rootId) {
-        queryClient.setQueryData<RelayEvent[]>(
-          threadRepliesKey(channelId, rootId),
-          (current = []) => mergeMessages(current, event),
+      const merged = mergeThreadReplyIntoCache(queryClient, channelId, event);
+      if (merged?.isNew && !isBroadcastReply(event.tags)) {
+        applyThreadReplySummaryBump(
+          queryClient,
+          channelId,
+          merged.rootId,
+          event,
         );
       }
       if (!isBroadcastReply(event.tags)) return;
@@ -715,12 +738,25 @@ export function useSendMessageMutation(
       queryClient.setQueryData(windowKey, nextWindow);
       projectChannelWindowMessages(queryClient, effectiveChannel.id);
 
+      const threadReference = parentEventId
+        ? getThreadReference(optimisticMessage.tags)
+        : null;
+      const threadReplyRootId = threadReference?.rootId ?? null;
+      if (threadReplyRootId) {
+        mergeThreadReplyIntoCache(
+          queryClient,
+          effectiveChannel.id,
+          optimisticMessage,
+        );
+      }
+
       return {
         optimisticId: optimisticMessage.id,
         previousMessages,
         previousWindow,
         channelId: effectiveChannel.id,
         queryKey,
+        threadReplyRootId,
       };
     },
     onError: (error, _variables, context) => {
@@ -737,6 +773,14 @@ export function useSendMessageMutation(
         channelWindowKey(context.channelId),
         context.previousWindow,
       );
+      if (context.threadReplyRootId) {
+        removeThreadReplyFromCache(
+          queryClient,
+          context.channelId,
+          context.threadReplyRootId,
+          context.optimisticId,
+        );
+      }
     },
     onSuccess: (message, _variables, context) => {
       // An accepted send proves the write-block is lifted; clear any recorded
@@ -762,6 +806,28 @@ export function useSendMessageMutation(
       });
       queryClient.setQueryData(windowKey, next);
       projectChannelWindowMessages(queryClient, context.channelId);
+
+      if (context.threadReplyRootId) {
+        removeThreadReplyFromCache(
+          queryClient,
+          context.channelId,
+          context.threadReplyRootId,
+          context.optimisticId,
+        );
+        const merged = mergeThreadReplyIntoCache(
+          queryClient,
+          context.channelId,
+          message,
+        );
+        if (merged?.isNew) {
+          applyThreadReplySummaryBump(
+            queryClient,
+            context.channelId,
+            merged.rootId,
+            message,
+          );
+        }
+      }
     },
   });
 }

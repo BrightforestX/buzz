@@ -358,6 +358,10 @@ function getActionCardClause(
       return configuredDetail
         ? `set the channel topic to ${configuredDetail}`
         : "update the channel topic";
+    case "invoke_chainlet":
+      return configuredDetail
+        ? `invoke chainlet ${configuredDetail}`
+        : "invoke a chainlet on the relay";
     default: {
       return (actionLabel ?? humanizeIdentifier(action)).toLocaleLowerCase();
     }

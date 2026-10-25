@@ -1,0 +1,167 @@
+# Buzz Scenarios + MiroFish experiment stack (all loopback ports the desktop/Tauri layer expects).
+#
+# Buzz Desktop / Scenarios tab env (defaults in run-buzz-desktop.sh):
+#   TRINO_HOST=http://127.0.0.1:8080
+#   SURREALDB_URL=http://127.0.0.1:8001
+#   SURREALDB_USER=root  SURREALDB_PASS=root
+#   SCENARIO_SURREAL_NS=sim
+#   BUZZ_SCENARIO_SURREAL_DB=buzz_mirofish_scenario
+#   MIROFISH_BASE_URL=http://127.0.0.1:5001
+#
+# Still host-local (not containerized here):
+#   Baseten LLM shim :8765  → ./scripts/ensure-baseten-shim.sh
+#   Chainlet shim    :8766  → MiroFish/.env BASETEN_CHAIN_ENDPOINT
+#   Buzz relay       pathx  → BUZZ_RELAY_URL
+#   OpenAPI Trino    :8081  → optional profile openapi-trino (Ontop); OPENAPI_TRINO_HOST
+#
+# Usage:
+#   docker compose -f docker-compose.buzz-stack.yml up -d
+#   ./scripts/buzz-stack-up.sh          # up + seed Surreal pm_issue
+#   ./scripts/open-scenario-stack-panes.sh
+
+name: buzz-stack
+
+networks:
+  buzz:
+    name: buzz-stack-net
+
+services:
+  # --- Scenario data (Trino → Surreal seed via host scripts) ---
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: buzz-stack-surrealdb
+    user: "0:0"
+    networks: [buzz]
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - buzz-stack-surreal-data:/data
+    command:
+      - start
+      - --log
+      - info
+      - --bind
+      - 0.0.0.0:8000
+      - --user
+      - root
+      - --pass
+      - root
+      - rocksdb:/data/db
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: scenarios
+      com.buzz.env.trino: "TRINO_HOST=http://127.0.0.1:8080"
+      com.buzz.env.surreal: "SURREALDB_URL=http://127.0.0.1:8001"
+
+  trino:
+    image: trinodb/trino:476
+    container_name: buzz-stack-trino
+    networks: [buzz]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ../../baseten-chain-mcp/docker/trino/catalog:/etc/trino/catalog:ro
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: scenarios
+
+  # --- MiroFish graph memory (zep-shim → Neo4j) ---
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: buzz-stack-neo4j
+    networks: [buzz]
+    environment:
+      NEO4J_AUTH: neo4j/shimpassword
+    ports:
+      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:7474:7474"
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: mirofish-graph
+
+  zep-shim:
+    build:
+      context: ../../zep-shim
+      dockerfile: Dockerfile.scenarios
+    container_name: buzz-stack-zep-shim
+    networks: [buzz]
+    depends_on:
+      - neo4j
+    environment:
+      ZEP_SHIM_HOST: 0.0.0.0
+      ZEP_SHIM_PORT: "8100"
+      ZEP_SHIM_NEO4J_URI: bolt://neo4j:7687
+      ZEP_SHIM_NEO4J_USER: neo4j
+      ZEP_SHIM_NEO4J_PASSWORD: shimpassword
+      ZEP_SHIM_LLM_BASE_URL: ${ZEP_SHIM_LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      ZEP_SHIM_EMBEDDING_MODEL: ${ZEP_SHIM_EMBEDDING_MODEL:-nomic-embed-text}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8100:8100"
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: mirofish-graph
+
+  mirofish:
+    image: ghcr.io/666ghj/mirofish:latest
+    platform: linux/amd64
+    container_name: buzz-stack-mirofish
+    networks: [buzz]
+    env_file:
+      - path: ../../MiroFish/.env
+        required: false
+    environment:
+      ZEP_SHIM_BASE_URL: http://zep-shim:8100/api/v2
+      ZEP_API_KEY: local
+      LLM_API_KEY: ${MIROFISH_LLM_API_KEY:-local}
+      LLM_PROVIDER: ${MIROFISH_LLM_PROVIDER:-baseten}
+      LLM_BASE_URL: ${MIROFISH_LLM_BASE_URL:-http://host.docker.internal:8765/v1}
+      BASETEN_OPENAI_BASE_URL: ${BASETEN_OPENAI_BASE_URL:-http://host.docker.internal:8765/v1}
+      BASETEN_CHAIN_ENDPOINT: ${BASETEN_CHAIN_ENDPOINT:-http://host.docker.internal:8766/run_remote}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - zep-shim
+    ports:
+      - "127.0.0.1:5001:5001"
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ../../MiroFish/backend/uploads:/app/backend/uploads
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: mirofish
+      com.buzz.env.mirofish: "MIROFISH_BASE_URL=http://127.0.0.1:5001"
+
+  # --- baseten-chain MCP graph parity (optional) ---
+  falkordb:
+    profiles: [chain-graph]
+    image: falkordb/falkordb:latest
+    container_name: buzz-stack-falkordb
+    networks: [buzz]
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: chain-mcp
+
+  temporal:
+    profiles: [chain-temporal]
+    image: temporalio/temporal:1.4.1
+    container_name: buzz-stack-temporal
+    networks: [buzz]
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    command:
+      - server
+      - start-dev
+      - --ip
+      - 0.0.0.0
+    restart: unless-stopped
+    labels:
+      com.buzz.stack: chain-mcp
+
+volumes:
+  buzz-stack-surreal-data:
+    name: buzz-stack-surreal-data
